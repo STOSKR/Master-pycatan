@@ -38,6 +38,7 @@ Run from repository root:
 
 ```bash
 python3 experiments/evaluate_llm_light.py \
+  --agent-class Shiyi_Catan.AlexPelochoJaimeLLMAgent.AlexPelochoJaimeLLMAgent \
   --model-config ollama=llama3.1:8b \
   --model-config bedrock=anthropic.claude-3-haiku-20240307-v1:0 \
   --model-config upv=gpt-4o-mini \
@@ -48,6 +49,10 @@ python3 experiments/evaluate_llm_light.py \
 Output artifacts are written to `experiments/results/`:
 - `*_summary.csv`
 - `*_metadata.json`
+
+You can point to any compatible LLM agent class with `--agent-class`.
+Example default value:
+- `PyCatan.Agents.AlexPelochoJaimeLLMAgent.AlexPelochoJaimeLLMAgent`
 
 ## Environment Variables for LLM providers
 

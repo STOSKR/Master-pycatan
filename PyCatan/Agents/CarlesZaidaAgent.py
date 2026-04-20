@@ -1,21 +1,28 @@
 import random
-from Classes.Constants import *
-from Classes.Materials import Materials
-from Classes.TradeOffer import TradeOffer
-from Interfaces.AgentInterface import AgentInterface
+from PyCatan.Classes.Constants import *
+from PyCatan.Classes.Materials import Materials
+from PyCatan.Classes.TradeOffer import TradeOffer
+from PyCatan.Interfaces.AgentInterface import AgentInterface
+
 
 class CarlesZaidaAgent(AgentInterface):
     # Inicialización de variables de clase
     town_number = 0  # Número de pueblos construidos
     material_given_more_than_three = None  # Material dado más de tres veces
-    year_of_plenty_material_one = MaterialConstants.CEREAL  # Primer material para la carta Año de la Abundancia
-    year_of_plenty_material_two = MaterialConstants.MINERAL  # Segundo material para la carta Año de la Abundancia
+    year_of_plenty_material_one = (
+        MaterialConstants.CEREAL
+    )  # Primer material para la carta Año de la Abundancia
+    year_of_plenty_material_two = (
+        MaterialConstants.MINERAL
+    )  # Segundo material para la carta Año de la Abundancia
 
     def __init__(self, agent_id):
         # Llamada al constructor de la clase base
         super().__init__(agent_id)
 
-    def on_trade_offer(self, board_instance, offer=TradeOffer(), player_making_offer=int):
+    def on_trade_offer(
+        self, board_instance, offer=TradeOffer(), player_making_offer=int
+    ):
         # Acepta la oferta si el jugador recibe más materiales de los que da
         return offer.gives.has_more(offer.receives)
 
@@ -30,8 +37,13 @@ class CarlesZaidaAgent(AgentInterface):
     def on_having_more_than_7_materials_when_thief_is_called(self):
         # Descartar materiales cuando se tiene más de 7 al llamar al ladrón
         while self.hand.get_total() > 7:
-            materials = [MaterialConstants.WOOL, MaterialConstants.CEREAL, MaterialConstants.MINERAL,
-                         MaterialConstants.CLAY, MaterialConstants.WOOD]
+            materials = [
+                MaterialConstants.WOOL,
+                MaterialConstants.CEREAL,
+                MaterialConstants.MINERAL,
+                MaterialConstants.CLAY,
+                MaterialConstants.WOOD,
+            ]
             for material in materials:
                 if self.hand.resources.get_from_id(material) > 1:
                     self.hand.remove_material(material, 1)
@@ -46,23 +58,31 @@ class CarlesZaidaAgent(AgentInterface):
 
         # Recorrer todos los terrenos para encontrar la mejor ubicación
         for terrain in self.board.terrain:
-            if not terrain['has_thief']:  # Si el terreno no tiene ladrón
-                nodes = self.board.__get_contacting_nodes__(terrain['id'])  # Obtener nodos conectados
+            if not terrain["has_thief"]:  # Si el terreno no tiene ladrón
+                nodes = self.board.__get_contacting_nodes__(
+                    terrain["id"]
+                )  # Obtener nodos conectados
                 block_value = 0
                 enemy = None
                 for node_id in nodes:
-                    player_id = self.board.nodes[node_id]['player']
-                    if player_id != self.id and player_id != -1:  # Si el jugador es un enemigo
+                    player_id = self.board.nodes[node_id]["player"]
+                    if (
+                        player_id != self.id and player_id != -1
+                    ):  # Si el jugador es un enemigo
                         block_value += 1  # Conteo simple del valor de bloqueo
                         if enemy is None or block_value > max_block_value:
                             enemy = player_id
                             max_block_value = block_value
                 if enemy:
-                    best_target = {'terrain': terrain['id'], 'player': enemy}
+                    best_target = {"terrain": terrain["id"], "player": enemy}
             else:
-                terrain_with_thief_id = terrain['id']
+                terrain_with_thief_id = terrain["id"]
 
-        return best_target if best_target else {'terrain': terrain_with_thief_id, 'player': -1}
+        return (
+            best_target
+            if best_target
+            else {"terrain": terrain_with_thief_id, "player": -1}
+        )
 
     def on_turn_end(self):
         # Juega una carta de punto de victoria si la tiene en la mano al final del turno
@@ -86,10 +106,17 @@ class CarlesZaidaAgent(AgentInterface):
             return None
         elif self.town_number >= 1:
             # Calcula los materiales a dar y recibir para construir una ciudad
-            total_given_materials = (2 - self.hand.resources.cereal) + (3 - self.hand.resources.mineral)
-            materials_to_give = self._determine_materials_to_give(total_given_materials,
-                                                                  [MaterialConstants.CLAY, MaterialConstants.WOOD,
-                                                                   MaterialConstants.WOOL])
+            total_given_materials = (2 - self.hand.resources.cereal) + (
+                3 - self.hand.resources.mineral
+            )
+            materials_to_give = self._determine_materials_to_give(
+                total_given_materials,
+                [
+                    MaterialConstants.CLAY,
+                    MaterialConstants.WOOD,
+                    MaterialConstants.WOOL,
+                ],
+            )
             gives = Materials(*materials_to_give)
             receives = Materials(2, 3, 0, 0, 0)
         elif self.town_number == 0:
@@ -98,14 +125,24 @@ class CarlesZaidaAgent(AgentInterface):
                 return None
             else:
                 # Calcula los materiales a recibir y a dar para construir un pueblo
-                materials_to_receive = [max(0, 1 - self.hand.resources.cereal), 0, max(0, 1 - self.hand.resources.clay),
-                                        max(0, 1 - self.hand.resources.wood), max(0, 1 - self.hand.resources.wool)]
+                materials_to_receive = [
+                    max(0, 1 - self.hand.resources.cereal),
+                    0,
+                    max(0, 1 - self.hand.resources.clay),
+                    max(0, 1 - self.hand.resources.wood),
+                    max(0, 1 - self.hand.resources.wool),
+                ]
                 total_received_materials = sum(materials_to_receive)
-                materials_to_give = self._determine_materials_to_give(total_received_materials,
-                                                                      [MaterialConstants.CEREAL,
-                                                                       MaterialConstants.MINERAL,
-                                                                       MaterialConstants.CLAY, MaterialConstants.WOOD,
-                                                                       MaterialConstants.WOOL])
+                materials_to_give = self._determine_materials_to_give(
+                    total_received_materials,
+                    [
+                        MaterialConstants.CEREAL,
+                        MaterialConstants.MINERAL,
+                        MaterialConstants.CLAY,
+                        MaterialConstants.WOOD,
+                        MaterialConstants.WOOL,
+                    ],
+                )
                 gives = Materials(*materials_to_give)
                 receives = Materials(*materials_to_receive)
 
@@ -119,7 +156,9 @@ class CarlesZaidaAgent(AgentInterface):
             random.shuffle(material_ids)
             for mat_id in material_ids:
                 if self.hand.resources.get_from_id(mat_id) > 1 or (
-                        mat_id == MaterialConstants.MINERAL and self.hand.resources.mineral > 1):
+                    mat_id == MaterialConstants.MINERAL
+                    and self.hand.resources.mineral > 1
+                ):
                     self.hand.remove_material(mat_id, 1)
                     materials_to_give[mat_id] += 1
                     break
@@ -132,33 +171,42 @@ class CarlesZaidaAgent(AgentInterface):
         if self.hand.resources.has_more(BuildConstants.CITY) and self.town_number > 0:
             possibilities = self.board.valid_city_nodes(self.id)
             for node_id in possibilities:
-                for terrain_piece_id in self.board.nodes[node_id]['contacting_terrain']:
-                    if self.board.terrain[terrain_piece_id]['probability'] >= 4:
+                for terrain_piece_id in self.board.nodes[node_id]["contacting_terrain"]:
+                    if self.board.terrain[terrain_piece_id]["probability"] >= 4:
                         self.town_number -= 1
-                        return {'building': BuildConstants.CITY, 'node_id': node_id}
+                        return {"building": BuildConstants.CITY, "node_id": node_id}
 
         if self.hand.resources.has_more(BuildConstants.TOWN):
             possibilities = self.board.valid_town_nodes(self.id)
             for node_id in possibilities:
-                for terrain_piece_id in self.board.nodes[node_id]['contacting_terrain']:
-                    if self.board.terrain[terrain_piece_id]['probability'] >= 3:
+                for terrain_piece_id in self.board.nodes[node_id]["contacting_terrain"]:
+                    if self.board.terrain[terrain_piece_id]["probability"] >= 3:
                         self.town_number += 1
-                        return {'building': BuildConstants.TOWN, 'node_id': node_id}
+                        return {"building": BuildConstants.TOWN, "node_id": node_id}
 
         if self.hand.resources.has_more(BuildConstants.ROAD):
             possibilities = self.board.valid_road_nodes(self.id)
             for road_obj in possibilities:
-                if self.board.is_coastal_node(road_obj['finishing_node']) and \
-                        self.board.nodes[road_obj['finishing_node']]['harbor'] != HarborConstants.NONE:
-                    return {'building': BuildConstants.ROAD, 'node_id': road_obj['starting_node'],
-                            'road_to': road_obj['finishing_node']}
+                if (
+                    self.board.is_coastal_node(road_obj["finishing_node"])
+                    and self.board.nodes[road_obj["finishing_node"]]["harbor"]
+                    != HarborConstants.NONE
+                ):
+                    return {
+                        "building": BuildConstants.ROAD,
+                        "node_id": road_obj["starting_node"],
+                        "road_to": road_obj["finishing_node"],
+                    }
             if possibilities:
                 road_node = possibilities[0]
-                return {'building': BuildConstants.ROAD, 'node_id': road_node['starting_node'],
-                        'road_to': road_node['finishing_node']}
+                return {
+                    "building": BuildConstants.ROAD,
+                    "node_id": road_node["starting_node"],
+                    "road_to": road_node["finishing_node"],
+                }
 
         if self.hand.resources.has_more(BuildConstants.CARD):
-            return {'building': BuildConstants.CARD}
+            return {"building": BuildConstants.CARD}
 
         return None
 
@@ -171,8 +219,12 @@ class CarlesZaidaAgent(AgentInterface):
 
         # Calcular el mejor nodo basado en el valor de bloqueo
         for node_id in possibilities:
-            blocking_score = sum(1 for adj_node_id in self.board.nodes[node_id]['adjacent']
-                                 if self.board.nodes[adj_node_id]['player'] != self.id and self.board.nodes[adj_node_id]['player'] != -1)
+            blocking_score = sum(
+                1
+                for adj_node_id in self.board.nodes[node_id]["adjacent"]
+                if self.board.nodes[adj_node_id]["player"] != self.id
+                and self.board.nodes[adj_node_id]["player"] != -1
+            )
             if blocking_score > best_blocking_score:
                 best_blocking_score = blocking_score
                 chosen_node_id = node_id
@@ -183,8 +235,10 @@ class CarlesZaidaAgent(AgentInterface):
 
         self.town_number += 1  # Incrementar el número de pueblos
 
-        possible_roads = self.board.nodes[chosen_node_id]['adjacent']
-        chosen_road_to_id = possible_roads[0]  # Seleccionar el primer nodo adyacente para construir una carretera
+        possible_roads = self.board.nodes[chosen_node_id]["adjacent"]
+        chosen_road_to_id = possible_roads[
+            0
+        ]  # Seleccionar el primer nodo adyacente para construir una carretera
 
         return chosen_node_id, chosen_road_to_id
 
@@ -198,22 +252,38 @@ class CarlesZaidaAgent(AgentInterface):
         if len(valid_nodes) > 1:
             road_node = valid_nodes[0]
             road_node_2 = valid_nodes[1]
-            return {'node_id': road_node['starting_node'], 'road_to': road_node['finishing_node'],
-                    'node_id_2': road_node_2['starting_node'], 'road_to_2': road_node_2['finishing_node']}
+            return {
+                "node_id": road_node["starting_node"],
+                "road_to": road_node["finishing_node"],
+                "node_id_2": road_node_2["starting_node"],
+                "road_to_2": road_node_2["finishing_node"],
+            }
         elif len(valid_nodes) == 1:
-            return {'node_id': valid_nodes[0]['starting_node'], 'road_to': valid_nodes[0]['finishing_node'],
-                    'node_id_2': None, 'road_to_2': None}
+            return {
+                "node_id": valid_nodes[0]["starting_node"],
+                "road_to": valid_nodes[0]["finishing_node"],
+                "node_id_2": None,
+                "road_to_2": None,
+            }
         return None
 
     def on_year_of_plenty_card_use(self):
         # Usa la carta Año de la Abundancia para obtener dos materiales específicos
-        return {'material': self.year_of_plenty_material_one, 'material_2': self.year_of_plenty_material_two}
+        return {
+            "material": self.year_of_plenty_material_one,
+            "material_2": self.year_of_plenty_material_two,
+        }
 
     def generate_trade_offers(self):
         # Genera ofertas de comercio basadas en los materiales que tiene en exceso
         offers = []
-        materials = [MaterialConstants.WOOL, MaterialConstants.CEREAL, MaterialConstants.MINERAL,
-                     MaterialConstants.CLAY, MaterialConstants.WOOD]
+        materials = [
+            MaterialConstants.WOOL,
+            MaterialConstants.CEREAL,
+            MaterialConstants.MINERAL,
+            MaterialConstants.CLAY,
+            MaterialConstants.WOOD,
+        ]
 
         for material in materials:
             if self.hand.resources.get_from_id(material) > 3:
@@ -249,4 +319,6 @@ class CarlesZaidaAgent(AgentInterface):
         elif self.hand.resources.has_more(BuildConstants.CARD):
             self.on_build_phase(self.board)
         else:
-            self.trade_resource(MaterialConstants.CLAY)  # Ejemplo de intercambio de arcilla si no hay preferencia específica
+            self.trade_resource(
+                MaterialConstants.CLAY
+            )  # Ejemplo de intercambio de arcilla si no hay preferencia específica
