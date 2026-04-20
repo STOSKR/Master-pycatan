@@ -1,0 +1,12 @@
+Workers a utilizar (95.0%): 5
+Agentes benchmark válidos: 10 de 10
+Total de partidas a simular: 8. Tiempo estimado: 0.00 minutos
+Progreso: 8/8 partidas completadas (100.00%)
+
+Resultados ordenados por ratio de victorias:
+Agents.AlexPelochoJaimeHeuristicAgent.AlexPelochoJaimeHeuristicAgent: 4 victorias, 40 puntos en 4 partidas — Ratio: 100.00%, Media puntos: 10.00, Puesto medio: 1.00, Fallback rate: 0.00% (0/0)
+Agents.AlexPelochoJaimeLLMAgent.AlexPelochoJaimeLLMAgent: 4 victorias, 40 puntos en 4 partidas — Ratio: 100.00%, Media puntos: 10.00, Puesto medio: 1.00, Fallback rate: 100.00% (217/217)
+
+ Resultados guardados en: benchmark_vs_estandar_resultados.csv
+
+ Tiempo total: 0h 0m 12s

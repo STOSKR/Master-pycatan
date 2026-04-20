@@ -3,8 +3,12 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
+import glob
 import json
 import os
+import re
+import shutil
+import subprocess
 import time
 import urllib.error
 import urllib.request
@@ -45,11 +49,15 @@ class BaseLLMProvider(ABC):
     model: str
 
     @abstractmethod
-    def generate(self, system_prompt: str, user_prompt: str, timeout_seconds: float) -> LLMGeneration:
+    def generate(
+        self, system_prompt: str, user_prompt: str, timeout_seconds: float
+    ) -> LLMGeneration:
         raise NotImplementedError
 
 
-def _post_json(url: str, payload: Dict[str, Any], headers: Dict[str, str], timeout_seconds: float) -> Dict[str, Any]:
+def _post_json(
+    url: str, payload: Dict[str, Any], headers: Dict[str, str], timeout_seconds: float
+) -> Dict[str, Any]:
     data = json.dumps(payload).encode("utf-8")
     request = urllib.request.Request(url=url, data=data, method="POST")
     for key, value in headers.items():
@@ -69,25 +77,143 @@ def _post_json(url: str, payload: Dict[str, Any], headers: Dict[str, str], timeo
 class OllamaProvider(BaseLLMProvider):
     provider_name = "ollama"
 
-    def __init__(self, model: str, base_url: str = "http://127.0.0.1:11434"):
+    def __init__(
+        self,
+        model: str,
+        base_url: str = "http://127.0.0.1:11434",
+        cli_path: Optional[str] = None,
+    ):
         self.model = model
         self.base_url = base_url.rstrip("/")
+        self.cli_path = cli_path.strip() if cli_path else ""
+        self._resolved_cli_path: Optional[str] = None
 
-    def generate(self, system_prompt: str, user_prompt: str, timeout_seconds: float) -> LLMGeneration:
+    def _candidate_cli_paths(self) -> List[str]:
+        candidates: List[str] = []
+
+        env_cli = os.getenv("CATAN_OLLAMA_CLI_PATH", "").strip()
+        if env_cli:
+            candidates.append(env_cli)
+
+        if self.cli_path:
+            candidates.append(self.cli_path)
+
+        candidates.append("ollama")
+
+        user_profile = os.getenv("USERPROFILE", "").strip()
+        if user_profile:
+            candidates.append(
+                os.path.join(
+                    user_profile, "AppData", "Local", "Programs", "Ollama", "ollama.exe"
+                )
+            )
+
+        candidates.extend(
+            glob.glob("/mnt/c/Users/*/AppData/Local/Programs/Ollama/ollama.exe")
+        )
+
+        # Preserve order while removing duplicates.
+        deduped: List[str] = []
+        seen = set()
+        for item in candidates:
+            normalized = item.strip()
+            if normalized and normalized not in seen:
+                deduped.append(normalized)
+                seen.add(normalized)
+        return deduped
+
+    def _resolve_cli_path(self) -> Optional[str]:
+        if self._resolved_cli_path:
+            return self._resolved_cli_path
+
+        for candidate in self._candidate_cli_paths():
+            if os.path.isabs(candidate):
+                if os.path.exists(candidate):
+                    self._resolved_cli_path = candidate
+                    return candidate
+                continue
+
+            executable = shutil.which(candidate)
+            if executable:
+                self._resolved_cli_path = executable
+                return executable
+
+        return None
+
+    def _generate_via_cli(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        timeout_seconds: float,
+    ) -> Optional[LLMGeneration]:
+        cli = self._resolve_cli_path()
+        if not cli:
+            return None
+
+        combined_prompt = (
+            f"System instructions:\n{system_prompt}\n\n"
+            f"User payload (JSON):\n{user_prompt}\n\n"
+            "Return only JSON with action_index."
+        )
+
+        try:
+            completed = subprocess.run(
+                [cli, "run", self.model],
+                input=combined_prompt,
+                text=True,
+                capture_output=True,
+                timeout=max(1.0, timeout_seconds),
+            )
+        except Exception:
+            return None
+
+        if completed.returncode != 0:
+            return None
+
+        text = (completed.stdout or "").strip()
+        if not text:
+            return None
+
+        return LLMGeneration(
+            text=text,
+            raw_response={
+                "transport": "ollama_cli",
+                "stderr": (completed.stderr or "")[-2000:],
+            },
+            input_tokens=None,
+            output_tokens=None,
+        )
+
+    def generate(
+        self, system_prompt: str, user_prompt: str, timeout_seconds: float
+    ) -> LLMGeneration:
         payload = {
             "model": self.model,
             "stream": False,
+            "format": "json",
+            "options": {"temperature": 0},
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
         }
-        response_json = _post_json(
-            url=f"{self.base_url}/api/chat",
-            payload=payload,
-            headers={"Content-Type": "application/json"},
-            timeout_seconds=timeout_seconds,
-        )
+
+        try:
+            response_json = _post_json(
+                url=f"{self.base_url}/api/chat",
+                payload=payload,
+                headers={"Content-Type": "application/json"},
+                timeout_seconds=timeout_seconds,
+            )
+        except ProviderError:
+            fallback_generation = self._generate_via_cli(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                timeout_seconds=timeout_seconds,
+            )
+            if fallback_generation is None:
+                raise
+            return fallback_generation
 
         message = response_json.get("message", {})
         text = message.get("content", "")
@@ -108,7 +234,9 @@ class UPVProvider(BaseLLMProvider):
         self.chat_endpoint = chat_endpoint
         self.api_key = api_key
 
-    def generate(self, system_prompt: str, user_prompt: str, timeout_seconds: float) -> LLMGeneration:
+    def generate(
+        self, system_prompt: str, user_prompt: str, timeout_seconds: float
+    ) -> LLMGeneration:
         payload = {
             "model": self.model,
             "temperature": 0.1,
@@ -157,7 +285,9 @@ class BedrockProvider(BaseLLMProvider):
 
         self._client = boto3.client("bedrock-runtime", region_name=region_name)
 
-    def generate(self, system_prompt: str, user_prompt: str, timeout_seconds: float) -> LLMGeneration:
+    def generate(
+        self, system_prompt: str, user_prompt: str, timeout_seconds: float
+    ) -> LLMGeneration:
         # boto3 handles timeout via config; this method keeps a compatible signature.
         response_json = self._client.converse(
             modelId=self.model,
@@ -265,8 +395,44 @@ def _extract_first_json_object(text: str) -> Optional[Dict[str, Any]]:
     return None
 
 
+def _extract_action_index_relaxed(text: str) -> Optional[int]:
+    if not text:
+        return None
+
+    stripped = text.strip()
+    if stripped.isdigit():
+        try:
+            return int(stripped)
+        except ValueError:
+            pass
+
+    patterns = [
+        r'"action_index"\s*[:=]\s*"?(\d+)"?',
+        r"\baction_index\b\s*(?:is|=|:)\s*(\d+)",
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            try:
+                return int(match.group(1))
+            except ValueError:
+                continue
+
+    numbers = re.findall(r"\b\d+\b", stripped)
+    if len(numbers) == 1 and len(stripped) <= 120:
+        try:
+            return int(numbers[0])
+        except ValueError:
+            return None
+
+    return None
+
+
 class LLMDecisionEngine:
-    def __init__(self, provider: Optional[BaseLLMProvider], default_timeout_seconds: float = 8.0):
+    def __init__(
+        self, provider: Optional[BaseLLMProvider], default_timeout_seconds: float = 8.0
+    ):
         self.provider = provider
         self.default_timeout_seconds = default_timeout_seconds
 
@@ -341,7 +507,19 @@ class LLMDecisionEngine:
         latency_ms = int((time.perf_counter() - start) * 1000)
 
         parsed = _extract_first_json_object(generation.text)
-        if not parsed or "action_index" not in parsed:
+        action_index: Optional[int] = None
+
+        if parsed and "action_index" in parsed:
+            parsed_index = parsed.get("action_index")
+            if isinstance(parsed_index, int):
+                action_index = parsed_index
+            elif isinstance(parsed_index, str) and parsed_index.isdigit():
+                action_index = int(parsed_index)
+
+        if action_index is None:
+            action_index = _extract_action_index_relaxed(generation.text)
+
+        if action_index is None:
             return DecisionOutcome(
                 decision_name=decision_name,
                 selected_index=fallback_index,
@@ -357,8 +535,7 @@ class LLMDecisionEngine:
                 output_tokens=generation.output_tokens,
             )
 
-        action_index = parsed.get("action_index")
-        if not isinstance(action_index, int) or action_index < 0 or action_index >= len(legal_actions):
+        if action_index < 0 or action_index >= len(legal_actions):
             return DecisionOutcome(
                 decision_name=decision_name,
                 selected_index=fallback_index,

@@ -23,10 +23,11 @@ from PyCatan.Interfaces.AgentInterface import AgentInterface as AgIn
 
 BENCHMARK_AGENTS = [ra, aha, apa, apja, cza, ca, ea, paaa, sa, ta]
 
-n_matches_per_permutation = 5
-max_permutations = 25
-random_seed = 42
-porcentaje_workers = 0.95
+n_matches_per_permutation = int(os.getenv("CATAN_BENCH_N_MATCHES_PER_PERM", "5"))
+max_permutations = int(os.getenv("CATAN_BENCH_MAX_PERMUTATIONS", "25"))
+random_seed = int(os.getenv("CATAN_BENCH_RANDOM_SEED", "42"))
+porcentaje_workers = float(os.getenv("CATAN_BENCH_WORKERS_PCT", "0.95"))
+max_rounds = int(os.getenv("CATAN_BENCH_MAX_ROUNDS", "200"))
 
 # Agentes a evaluar: (ruta_clase, params)
 agentes_a_evaluar = [
@@ -80,7 +81,7 @@ def simulate_match(opponents, position, agente_alumno_clase, params=None):
         match_agents.insert(position, agente_alumno_class)
 
         game_director = GameDirector(
-            agents=match_agents, max_rounds=200, store_trace=False
+            agents=match_agents, max_rounds=max_rounds, store_trace=False
         )
         game_trace = game_director.game_start(print_outcome=False)
 
@@ -131,6 +132,9 @@ def simulate_match(opponents, position, agente_alumno_clase, params=None):
 
 
 if __name__ == "__main__":
+    llm_provider = os.getenv("CATAN_LLM_PROVIDER", "")
+    llm_model = os.getenv("CATAN_LLM_MODEL", "")
+
     results = {
         agent + str(params) if params is not None else agent: {
             "wins": 0,
@@ -173,6 +177,21 @@ if __name__ == "__main__":
     batch_size = 10000
     futures_batch = []
     resumen_csv = []
+    csv_fieldnames = [
+        "Agente",
+        "Tipo Agente",
+        "Partidas",
+        "Victorias",
+        "Ratio Victorias",
+        "Puntos Totales",
+        "Media Puntos",
+        "Puesto Medio",
+        "Decisiones LLM",
+        "Fallback Count",
+        "Fallback Rate",
+        "LLM Provider",
+        "LLM Model",
+    ]
 
     with concurrent.futures.ProcessPoolExecutor(
         max_workers=workers_a_utilizar
@@ -276,39 +295,30 @@ if __name__ == "__main__":
             f"Ratio: {ratio:.2%}, Media puntos: {avg_points:.2f}, Puesto medio: {puesto_medio:.2f}, "
             f"Fallback rate: {fallback_rate:.2%} ({fallback_count}/{decisions})"
         )
+        tipo_agente = "LLM" if "LLM" in nombre else "Heuristico"
         resumen_csv.append(
-            [
-                nombre,
-                wins,
-                points,
-                total,
-                f"{ratio:.4f}",
-                f"{avg_points:.2f}",
-                f"{puesto_medio:.2f}",
-                decisions,
-                fallback_count,
-                f"{fallback_rate:.4f}",
-            ]
+            {
+                "Agente": nombre,
+                "Tipo Agente": tipo_agente,
+                "Partidas": total,
+                "Victorias": wins,
+                "Ratio Victorias": f"{ratio:.4f}",
+                "Puntos Totales": points,
+                "Media Puntos": f"{avg_points:.2f}",
+                "Puesto Medio": f"{puesto_medio:.2f}",
+                "Decisiones LLM": decisions,
+                "Fallback Count": fallback_count,
+                "Fallback Rate": f"{fallback_rate:.4f}",
+                "LLM Provider": llm_provider if tipo_agente == "LLM" else "",
+                "LLM Model": llm_model if tipo_agente == "LLM" else "",
+            }
         )
 
     # Guardar CSV
     csv_filename = "benchmark_vs_estandar_resultados.csv"
     with open(csv_filename, mode="w", newline="") as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(
-            [
-                "Agente",
-                "Victorias",
-                "Puntos",
-                "Partidas",
-                "Ratio Victorias",
-                "Media Puntos",
-                "Puesto Medio",
-                "Decisiones LLM",
-                "Fallback Count",
-                "Fallback Rate",
-            ]
-        )
+        writer = csv.DictWriter(csvfile, fieldnames=csv_fieldnames)
+        writer.writeheader()
         writer.writerows(resumen_csv)
 
     print(f"\n Resultados guardados en: {csv_filename}")

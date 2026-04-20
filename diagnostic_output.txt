@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/mnt/a/Master-pycatan/run_diag.py", line 3, in <module>
+    from pycatan.game import Game
+ModuleNotFoundError: No module named 'pycatan'
