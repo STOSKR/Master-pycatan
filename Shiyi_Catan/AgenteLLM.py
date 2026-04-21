@@ -3,11 +3,19 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 import json
+import random
 
-from PyCatan.Agents.AlexPelochoJaimeHeuristicAgent import (
-    AgentBehaviorConfig,
-    AlexPelochoJaimeHeuristicAgent,
-)
+try:
+    from Shiyi_Catan.AgenteHeuristico import (
+        AgentBehaviorConfig,
+        AlexPelochoJaimeHeuristicAgent,
+    )
+except ImportError:
+    # Fallback for contexts where the local package path is not available.
+    from PyCatan.Agents.AlexPelochoJaimeHeuristicAgent import (
+        AgentBehaviorConfig,
+        AlexPelochoJaimeHeuristicAgent,
+    )
 from PyCatan.Agents.heuristic_core import (
     road_score,
     settlement_score,
@@ -34,6 +42,10 @@ class LLMBehaviorConfig:
     max_actions_on_game_start: int = 14
     max_actions_on_build_phase: int = 14
     decision_timeout_seconds: float = 8.0
+    exploration_rate_on_game_start: float = 0.10
+    exploration_rate_on_build_phase: float = 0.12
+    intentional_pass_rate_on_build_phase: float = 0.12
+    top_k_exploration_actions: int = 5
 
 
 class AlexPelochoJaimeLLMAgent(AlexPelochoJaimeHeuristicAgent):
@@ -86,6 +98,34 @@ class AlexPelochoJaimeLLMAgent(AlexPelochoJaimeHeuristicAgent):
     def _action_key(action: Dict[str, Any]) -> str:
         return json.dumps(action, sort_keys=True, separators=(",", ":"))
 
+    @staticmethod
+    def _clamp_probability(value: float) -> float:
+        return max(0.0, min(1.0, value))
+
+    def _maybe_explore_action(
+        self,
+        chosen_action: Dict[str, Any],
+        legal_actions: List[Dict[str, Any]],
+        exploration_rate: float,
+    ) -> Dict[str, Any]:
+        if len(legal_actions) <= 1:
+            return chosen_action
+
+        if random.random() >= self._clamp_probability(exploration_rate):
+            return chosen_action
+
+        chosen_key = self._action_key(chosen_action)
+        k = max(1, min(self.llm_config.top_k_exploration_actions, len(legal_actions)))
+        candidates = [
+            action
+            for action in legal_actions[:k]
+            if self._action_key(action) != chosen_key
+        ]
+        if not candidates:
+            return chosen_action
+
+        return random.choice(candidates)
+
     def _starting_actions(self, max_actions: int) -> List[Dict[str, int]]:
         actions_with_scores: List[Tuple[float, Dict[str, int]]] = []
 
@@ -94,7 +134,9 @@ class AlexPelochoJaimeLLMAgent(AlexPelochoJaimeHeuristicAgent):
             for road_to in self.board.nodes[node_id]["adjacent"]:
                 road_score_hint = settlement_score(self.board, road_to, self.weights)
                 score = node_score * 1.0 + road_score_hint * 0.35
-                actions_with_scores.append((score, {"node_id": node_id, "road_to": road_to}))
+                actions_with_scores.append(
+                    (score, {"node_id": node_id, "road_to": road_to})
+                )
 
         actions_with_scores.sort(
             key=lambda item: (-item[0], item[1]["node_id"], item[1]["road_to"])
@@ -122,13 +164,16 @@ class AlexPelochoJaimeLLMAgent(AlexPelochoJaimeHeuristicAgent):
         if self.hand.resources.has_more(BuildConstants.ROAD):
             valid_town_nodes = self.board.valid_town_nodes(self.id)
             for option in self.board.valid_road_nodes(self.id):
-                score = road_score(
-                    self.board,
-                    self.id,
-                    option,
-                    self.weights,
-                    valid_town_nodes=valid_town_nodes,
-                ) + 5.0
+                score = (
+                    road_score(
+                        self.board,
+                        self.id,
+                        option,
+                        self.weights,
+                        valid_town_nodes=valid_town_nodes,
+                    )
+                    + 5.0
+                )
                 actions_with_scores.append(
                     (
                         score,
@@ -159,10 +204,17 @@ class AlexPelochoJaimeLLMAgent(AlexPelochoJaimeHeuristicAgent):
     def on_game_start(self, board_instance):
         heuristic_node, heuristic_road = super().on_game_start(board_instance)
 
-        if not (self.llm_config.enable_on_game_start and self.decision_engine.is_enabled):
+        if getattr(self, "_casual_game", False):
             return heuristic_node, heuristic_road
 
-        legal_actions = self._starting_actions(self.llm_config.max_actions_on_game_start)
+        if not (
+            self.llm_config.enable_on_game_start and self.decision_engine.is_enabled
+        ):
+            return heuristic_node, heuristic_road
+
+        legal_actions = self._starting_actions(
+            self.llm_config.max_actions_on_game_start
+        )
         if not legal_actions:
             return heuristic_node, heuristic_road
 
@@ -193,7 +245,11 @@ class AlexPelochoJaimeLLMAgent(AlexPelochoJaimeHeuristicAgent):
         )
         self._record_decision(outcome)
 
-        action = outcome.selected_action
+        action = self._maybe_explore_action(
+            chosen_action=outcome.selected_action,
+            legal_actions=legal_actions,
+            exploration_rate=self.llm_config.exploration_rate_on_game_start,
+        )
         node_id = action.get("node_id")
         road_to = action.get("road_to")
 
@@ -209,7 +265,12 @@ class AlexPelochoJaimeLLMAgent(AlexPelochoJaimeHeuristicAgent):
     def on_build_phase(self, board_instance):
         heuristic_action = super().on_build_phase(board_instance)
 
-        if not (self.llm_config.enable_on_build_phase and self.decision_engine.is_enabled):
+        if getattr(self, "_casual_game", False):
+            return heuristic_action
+
+        if not (
+            self.llm_config.enable_on_build_phase and self.decision_engine.is_enabled
+        ):
             return heuristic_action
 
         legal_actions = self._build_actions(self.llm_config.max_actions_on_build_phase)
@@ -247,7 +308,17 @@ class AlexPelochoJaimeLLMAgent(AlexPelochoJaimeHeuristicAgent):
         )
         self._record_decision(outcome)
 
-        action = outcome.selected_action
+        action = self._maybe_explore_action(
+            chosen_action=outcome.selected_action,
+            legal_actions=legal_actions,
+            exploration_rate=self.llm_config.exploration_rate_on_build_phase,
+        )
+
+        if random.random() < self._clamp_probability(
+            self.llm_config.intentional_pass_rate_on_build_phase
+        ):
+            return None
+
         if action.get("building") == END_BUILD_ACTION:
             return None
 
