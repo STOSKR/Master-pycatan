@@ -1,3 +1,0 @@
-Agente,Tipo Agente,Partidas,Victorias,Ratio Victorias,Puntos Totales,Media Puntos,Puesto Medio,Decisiones LLM,Fallback Count,Fallback Rate,LLM Provider,LLM Model
-AlexPelochoJaimeHeuristicAgent,Heuristico,4,1,0.2500,8,2.00,2.50,0,0,0.0000,,
-AlexPelochoJaimeLLMAgent,LLM,4,0,0.0000,8,2.00,2.75,15,15,1.0000,ollama ,qwen2.5:0.5b 
