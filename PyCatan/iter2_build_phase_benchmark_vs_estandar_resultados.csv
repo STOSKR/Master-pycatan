@@ -1,0 +1,4 @@
+agent_path,agent_name,benchmark_type,seed,matches,wins,winrate,points_total,avg_points,avg_rank,llm_decisions,fallback_count,fallback_rate,provider,model
+PyCatan.Agents.AlexPelochoJaimeHeuristicAgent.AlexPelochoJaimeHeuristicAgent,AlexPelochoJaimeHeuristicAgent,vs_standard,42,500,203,0.4060,3257,6.5140,2.1680,0,0,0.0000,,
+PyCatan.Agents.AlexPelochoJaimeHeuristicAgent.AlexPelochoJaimeHeuristicAgent,AlexPelochoJaimeHeuristicAgent,vs_standard,2026,500,180,0.3600,3141,6.2820,2.1820,0,0,0.0000,,
+PyCatan.Agents.AlexPelochoJaimeHeuristicAgent.AlexPelochoJaimeHeuristicAgent,AlexPelochoJaimeHeuristicAgent,vs_standard,31415,500,209,0.4180,3284,6.5680,2.1020,0,0,0.0000,,

@@ -1,3 +1,3 @@
-Agente,Victorias,Puntos,Partidas,Ratio Victorias,Media Puntos,Puesto Medio,Decisiones LLM,Fallback Count,Fallback Rate
-Agents.AlexPelochoJaimeHeuristicAgent.AlexPelochoJaimeHeuristicAgent,4,40,4,1.0000,10.00,1.00,0,0,0.0000
-Agents.AlexPelochoJaimeLLMAgent.AlexPelochoJaimeLLMAgent,4,40,4,1.0000,10.00,1.00,217,217,1.0000
+agent_path,agent_name,benchmark_type,seed,matches,wins,winrate,points_total,avg_points,avg_rank,llm_decisions,fallback_count,fallback_rate,provider,model
+PyCatan.Agents.ShiyiHeuristicAgent.ShiyiHeuristicAgent,ShiyiHeuristicAgent,vs_standard,42,4,3,0.7500,34,8.5000,1.2500,0,0,0.0000,,
+PyCatan.Agents.ShiyiLLMAgent.ShiyiLLMAgent,ShiyiLLMAgent,vs_standard,42,4,4,1.0000,41,10.2500,1.0000,0,0,0.0000,,

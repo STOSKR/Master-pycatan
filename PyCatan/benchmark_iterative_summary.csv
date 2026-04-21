@@ -1,0 +1,6 @@
+iteration,flags,mean_winrate,std_winrate,min_winrate,gate_70
+iter0_random_baseline,"{""on_build_phase"": false, ""on_commerce_phase"": false, ""on_game_start"": false, ""on_moving_thief"": false}",0.2733,0.0047,0.2700,False
+iter1_game_start,"{""on_build_phase"": false, ""on_commerce_phase"": false, ""on_game_start"": true, ""on_moving_thief"": false}",0.2800,0.0294,0.2500,False
+iter2_build_phase,"{""on_build_phase"": true, ""on_commerce_phase"": false, ""on_game_start"": true, ""on_moving_thief"": false}",0.8433,0.0499,0.7900,True
+iter3_commerce_trade,"{""on_build_phase"": true, ""on_commerce_phase"": true, ""on_game_start"": true, ""on_moving_thief"": false}",1.0000,0.0000,1.0000,True
+iter4_thief_devcards,"{""on_build_phase"": true, ""on_commerce_phase"": true, ""on_game_start"": true, ""on_moving_thief"": true}",1.0000,0.0000,1.0000,True

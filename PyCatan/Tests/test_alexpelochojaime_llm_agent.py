@@ -1,6 +1,6 @@
 import unittest
 
-from PyCatan.Agents.AlexPelochoJaimeLLMAgent import AlexPelochoJaimeLLMAgent
+from PyCatan.Agents.ShiyiLLMAgent import ShiyiLLMAgent
 from PyCatan.Agents.llm_engine import BaseLLMProvider, LLMGeneration
 from PyCatan.Classes.Board import Board
 
@@ -19,7 +19,7 @@ class StaticProvider(BaseLLMProvider):
 class TestAlexPelochoJaimeLLMAgent(unittest.TestCase):
     def test_on_game_start_returns_legal_choice_with_llm(self):
         board = Board()
-        agent = AlexPelochoJaimeLLMAgent(agent_id=0, provider=StaticProvider("stub", 0))
+        agent = ShiyiLLMAgent(agent_id=0, provider=StaticProvider("stub", 0))
 
         node_id, road_to = agent.on_game_start(board)
 
@@ -29,7 +29,7 @@ class TestAlexPelochoJaimeLLMAgent(unittest.TestCase):
 
     def test_on_build_phase_handles_end_action(self):
         board = Board()
-        agent = AlexPelochoJaimeLLMAgent(agent_id=0, provider=StaticProvider("stub", 0))
+        agent = ShiyiLLMAgent(agent_id=0, provider=StaticProvider("stub", 0))
 
         action = agent.on_build_phase(board)
 
