@@ -1,0 +1,35 @@
+Workers a utilizar (10.0%): 1
+
+
+==== Evaluando agente: AlexPelochoJaimeHeuristicAgent ====
+
+- Posición 1: 1 victorias de 1 partidas (100.00%)
+- Posición 2: 0 victorias de 1 partidas (0.00%)
+- Posición 3: 0 victorias de 1 partidas (0.00%)
+- Posición 4: 0 victorias de 1 partidas (0.00%)
+
+Total para AlexPelochoJaimeHeuristicAgent: 1 victorias de 4 partidas (25.00%)
+Media de puntos: 2.00
+Puesto medio: 2.50
+Fallback rate: 0.00% (0/0)
+Tiempo parcial: 0h 0m 0s
+
+
+==== Evaluando agente: AlexPelochoJaimeLLMAgent ====
+
+- Posición 1: 0 victorias de 1 partidas (0.00%)
+- Posición 2: 0 victorias de 1 partidas (0.00%)
+- Posición 3: 0 victorias de 1 partidas (0.00%)
+- Posición 4: 0 victorias de 1 partidas (0.00%)
+
+Total para AlexPelochoJaimeLLMAgent: 0 victorias de 4 partidas (0.00%)
+Media de puntos: 2.00
+Puesto medio: 2.75
+Fallback rate: 100.00% (15/15)
+Tiempo parcial: 0h 2m 0s
+
+
+Resultados guardados en: benchmark_vs_random_resultados.csv
+
+Tiempo total: 0h 2m 0s
+
