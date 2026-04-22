@@ -316,6 +316,62 @@ class BedrockProvider(BaseLLMProvider):
         )
 
 
+def _looks_like_aws_access_key_id(value: str) -> bool:
+    normalized = (value or "").strip()
+    return normalized.startswith("AKIA") or normalized.startswith("ASIA")
+
+
+def _prepare_bedrock_credentials_from_env() -> None:
+    """
+    Supports two Bedrock auth modes:
+    1) Standard AWS credentials (access key id + secret + optional session token).
+    2) Bearer token mode used in class labs via AWS_BEARER_TOKEN_BEDROCK.
+    """
+    catan_access = os.getenv("CATAN_AWS_ACCESS_KEY", "").strip()
+    catan_secret = os.getenv("CATAN_AWS_SECRET_KEY", "").strip()
+    catan_session = os.getenv("CATAN_AWS_SESSION_TOKEN", "").strip()
+
+    if catan_access:
+        if _looks_like_aws_access_key_id(catan_access):
+            os.environ.setdefault("AWS_ACCESS_KEY_ID", catan_access)
+        else:
+            # Lab mode (single Bedrock bearer key).
+            os.environ.setdefault("AWS_BEARER_TOKEN_BEDROCK", catan_access)
+
+    if catan_secret:
+        os.environ.setdefault("AWS_SECRET_ACCESS_KEY", catan_secret)
+    if catan_session:
+        os.environ.setdefault("AWS_SESSION_TOKEN", catan_session)
+
+    bearer = os.getenv("AWS_BEARER_TOKEN_BEDROCK", "").strip()
+    access_id = os.getenv("AWS_ACCESS_KEY_ID", "").strip()
+    secret = os.getenv("AWS_SECRET_ACCESS_KEY", "").strip()
+
+    # If bearer mode is present and key-id is partial/misaligned, prefer bearer mode.
+    if bearer and access_id and not secret:
+        os.environ.pop("AWS_ACCESS_KEY_ID", None)
+
+
+def _resolve_upv_api_key() -> str:
+    """
+    Resolves UPV API key from the preferred env var and accepted alias.
+    Priority:
+    1) CATAN_UPV_API_KEY
+    2) API_UPV
+    """
+    canonical = os.getenv("CATAN_UPV_API_KEY", "").strip()
+    if canonical:
+        return canonical
+
+    alias = os.getenv("API_UPV", "").strip()
+    if alias:
+        # Keep downstream tooling consistent once alias is used.
+        os.environ.setdefault("CATAN_UPV_API_KEY", alias)
+        return alias
+
+    return ""
+
+
 def build_provider_from_env() -> Optional[BaseLLMProvider]:
     provider = os.getenv("CATAN_LLM_PROVIDER", "").strip().lower()
     model = os.getenv("CATAN_LLM_MODEL", "").strip()
@@ -331,16 +387,17 @@ def build_provider_from_env() -> Optional[BaseLLMProvider]:
 
     if provider == "upv":
         chat_endpoint = os.getenv("CATAN_UPV_CHAT_ENDPOINT", "").strip()
-        api_key = os.getenv("CATAN_UPV_API_KEY", "").strip()
+        api_key = _resolve_upv_api_key()
         if not (chat_endpoint and api_key and model):
             raise ProviderError(
-                "UPV provider requires CATAN_UPV_CHAT_ENDPOINT, CATAN_UPV_API_KEY and CATAN_LLM_MODEL"
+                "UPV provider requires CATAN_UPV_CHAT_ENDPOINT, CATAN_LLM_MODEL and CATAN_UPV_API_KEY (or API_UPV)"
             )
         return UPVProvider(model=model, chat_endpoint=chat_endpoint, api_key=api_key)
 
     if provider == "bedrock":
         if not model:
             raise ProviderError("Bedrock provider requires CATAN_LLM_MODEL")
+        _prepare_bedrock_credentials_from_env()
         region = os.getenv("CATAN_BEDROCK_REGION", "eu-west-1")
         return BedrockProvider(model=model, region_name=region)
 

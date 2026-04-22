@@ -53,7 +53,7 @@ class ShiyiLLMAgent(ShiyiHeuristicAgent):
         if provider is None:
             try:
                 provider = build_provider_from_env()
-            except ProviderError as exc:
+            except Exception as exc:
                 self.llm_init_error = str(exc)
                 provider = None
 

@@ -69,13 +69,11 @@ def load_repo_env_file() -> None:
         if key and key not in os.environ:
             os.environ[key] = value.strip().strip('"').strip("'")
 
-    # Optional compatibility mapping for custom CATAN AWS keys.
-    if "AWS_ACCESS_KEY_ID" not in os.environ and "CATAN_AWS_ACCESS_KEY" in os.environ:
-        os.environ["AWS_ACCESS_KEY_ID"] = os.environ["CATAN_AWS_ACCESS_KEY"]
-    if "AWS_SECRET_ACCESS_KEY" not in os.environ and "CATAN_AWS_SECRET_KEY" in os.environ:
-        os.environ["AWS_SECRET_ACCESS_KEY"] = os.environ["CATAN_AWS_SECRET_KEY"]
-    if "AWS_SESSION_TOKEN" not in os.environ and "CATAN_AWS_SESSION_TOKEN" in os.environ:
-        os.environ["AWS_SESSION_TOKEN"] = os.environ["CATAN_AWS_SESSION_TOKEN"]
+    # Aliases for compatibility.
+    if "CATAN_UPV_API_KEY" not in os.environ and os.getenv("API_UPV", "").strip():
+        os.environ["CATAN_UPV_API_KEY"] = os.environ["API_UPV"].strip()
+
+    # AWS mapping is handled inside llm_engine (supports both bearer and classic creds).
 
 
 def load_agent_class(class_path: str):

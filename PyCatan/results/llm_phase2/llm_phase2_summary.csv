@@ -1,0 +1,4 @@
+provider,model,prompt_variant,seed,matches,wins,winrate,avg_points,avg_rank,fallback_rate,llm_decisions
+bedrock,us.amazon.nova-micro-v1:0,compact_json,42,4,4,1.0000,10.2500,1.0000,0.0629,175
+bedrock,us.amazon.nova-micro-v1:0,resource_focus,42,4,4,1.0000,10.0000,1.0000,0.0432,162
+bedrock,us.amazon.nova-micro-v1:0,safe_legal,42,4,4,1.0000,10.0000,1.0000,0.0000,201
