@@ -1,0 +1,5 @@
+provider,model,prompt_variant,benchmark_type,seed,matches,wins,winrate,avg_points,avg_rank,fallback_rate,llm_decisions,result_csv
+upv,poligpt,compact_json,vs_random,42,4,4,1.0000,10.0000,1.0000,0.3140,172,A:\Master-pycatan\PyCatan\results\upv_llm\20260422_111137\model_poligpt\prompt_compact_json\vs_random.csv
+upv,poligpt,compact_json,vs_standard,42,4,4,1.0000,10.0000,1.0000,0.8625,160,A:\Master-pycatan\PyCatan\results\upv_llm\20260422_111137\model_poligpt\prompt_compact_json\vs_standard.csv
+upv,llama-mini,compact_json,vs_random,42,4,4,1.0000,10.0000,1.0000,0.0000,174,A:\Master-pycatan\PyCatan\results\upv_llm\20260422_111137\model_llama-mini\prompt_compact_json\vs_random.csv
+upv,llama-mini,compact_json,vs_standard,42,4,4,1.0000,10.0000,1.0000,0.0000,169,A:\Master-pycatan\PyCatan\results\upv_llm\20260422_111137\model_llama-mini\prompt_compact_json\vs_standard.csv

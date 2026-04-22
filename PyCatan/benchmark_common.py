@@ -69,9 +69,17 @@ def load_repo_env_file() -> None:
         if key and key not in os.environ:
             os.environ[key] = value.strip().strip('"').strip("'")
 
-    # Aliases for compatibility.
-    if "CATAN_UPV_API_KEY" not in os.environ and os.getenv("API_UPV", "").strip():
-        os.environ["CATAN_UPV_API_KEY"] = os.environ["API_UPV"].strip()
+    # Aliases for compatibility (API_UPV can be either endpoint base URL or API key).
+    api_upv = os.getenv("API_UPV", "").strip()
+    if api_upv:
+        if api_upv.lower().startswith("http://") or api_upv.lower().startswith("https://"):
+            if "CATAN_UPV_CHAT_ENDPOINT" not in os.environ:
+                endpoint = api_upv.rstrip("/")
+                if not endpoint.endswith("/chat/completions"):
+                    endpoint = endpoint + "/chat/completions"
+                os.environ["CATAN_UPV_CHAT_ENDPOINT"] = endpoint
+        elif "CATAN_UPV_API_KEY" not in os.environ:
+            os.environ["CATAN_UPV_API_KEY"] = api_upv
 
     # AWS mapping is handled inside llm_engine (supports both bearer and classic creds).
 

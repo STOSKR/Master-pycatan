@@ -29,12 +29,21 @@ def _parse_csv_env(name: str, default_values: List[str]) -> List[str]:
 
 def _validate_upv_env() -> Tuple[bool, List[str]]:
     missing = []
-    api_key = os.getenv("CATAN_UPV_API_KEY", "").strip() or os.getenv("API_UPV", "").strip()
+    api_upv = os.getenv("API_UPV", "").strip()
+    api_key = os.getenv("CATAN_UPV_API_KEY", "").strip()
+    endpoint = os.getenv("CATAN_UPV_CHAT_ENDPOINT", "").strip()
+
+    if api_upv and (api_upv.lower().startswith("http://") or api_upv.lower().startswith("https://")):
+        if not endpoint:
+            endpoint = api_upv.rstrip("/") + "/chat/completions"
+            os.environ.setdefault("CATAN_UPV_CHAT_ENDPOINT", endpoint)
+    elif api_upv and not api_key:
+        api_key = api_upv
+        os.environ.setdefault("CATAN_UPV_API_KEY", api_key)
+
     if not api_key:
         missing.append("CATAN_UPV_API_KEY")
-    else:
-        os.environ.setdefault("CATAN_UPV_API_KEY", api_key)
-    if not os.getenv("CATAN_UPV_CHAT_ENDPOINT", "").strip():
+    if not endpoint:
         missing.append("CATAN_UPV_CHAT_ENDPOINT")
     return (len(missing) == 0, missing)
 
@@ -79,7 +88,7 @@ if __name__ == "__main__":
         print(
             "Faltan variables para UPV. Anade en .env: "
             + ", ".join(missing)
-            + " (se acepta API_UPV como alias de CATAN_UPV_API_KEY)"
+            + " (API_UPV puede ser endpoint base o API key)"
         )
         raise SystemExit(1)
 

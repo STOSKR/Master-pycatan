@@ -1,0 +1,2 @@
+agent_path,agent_name,benchmark_type,seed,matches,wins,winrate,points_total,avg_points,avg_rank,llm_decisions,fallback_count,fallback_rate,provider,model
+PyCatan.Agents.ShiyiLLMAgent.ShiyiLLMAgent,ShiyiLLMAgent,vs_random,42,4,4,1.0000,41,10.2500,1.0000,152,0,0.0000,bedrock,us.meta.llama3-3-70b-instruct-v1:0

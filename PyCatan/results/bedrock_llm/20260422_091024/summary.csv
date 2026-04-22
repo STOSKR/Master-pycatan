@@ -1,0 +1,7 @@
+provider,model,prompt_variant,benchmark_type,seed,matches,wins,winrate,avg_points,avg_rank,fallback_rate,llm_decisions,result_csv
+bedrock,mistral.mistral-7b-instruct-v0:2,compact_json,vs_random,42,4,4,1.0000,10.5000,1.0000,1.0000,160,A:\Master-pycatan\PyCatan\results\bedrock_llm\20260422_091024\model_mistral_mistral-7b-instruct-v0_2\prompt_compact_json\vs_random.csv
+bedrock,mistral.mistral-7b-instruct-v0:2,compact_json,vs_standard,42,4,4,1.0000,10.0000,1.0000,1.0000,169,A:\Master-pycatan\PyCatan\results\bedrock_llm\20260422_091024\model_mistral_mistral-7b-instruct-v0_2\prompt_compact_json\vs_standard.csv
+bedrock,us.amazon.nova-lite-v1:0,compact_json,vs_random,42,4,4,1.0000,10.5000,1.0000,0.0000,171,A:\Master-pycatan\PyCatan\results\bedrock_llm\20260422_091024\model_us_amazon_nova-lite-v1_0\prompt_compact_json\vs_random.csv
+bedrock,us.amazon.nova-lite-v1:0,compact_json,vs_standard,42,4,4,1.0000,10.0000,1.0000,0.0000,146,A:\Master-pycatan\PyCatan\results\bedrock_llm\20260422_091024\model_us_amazon_nova-lite-v1_0\prompt_compact_json\vs_standard.csv
+bedrock,us.meta.llama3-3-70b-instruct-v1:0,compact_json,vs_random,42,4,4,1.0000,10.2500,1.0000,0.0000,152,A:\Master-pycatan\PyCatan\results\bedrock_llm\20260422_091024\model_us_meta_llama3-3-70b-instruct-v1_0\prompt_compact_json\vs_random.csv
+bedrock,us.meta.llama3-3-70b-instruct-v1:0,compact_json,vs_standard,42,4,4,1.0000,10.0000,1.0000,0.0000,208,A:\Master-pycatan\PyCatan\results\bedrock_llm\20260422_091024\model_us_meta_llama3-3-70b-instruct-v1_0\prompt_compact_json\vs_standard.csv

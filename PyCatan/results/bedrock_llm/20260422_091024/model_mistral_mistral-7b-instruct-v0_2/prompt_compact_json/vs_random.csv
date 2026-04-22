@@ -1,0 +1,2 @@
+agent_path,agent_name,benchmark_type,seed,matches,wins,winrate,points_total,avg_points,avg_rank,llm_decisions,fallback_count,fallback_rate,provider,model
+PyCatan.Agents.ShiyiLLMAgent.ShiyiLLMAgent,ShiyiLLMAgent,vs_random,42,4,4,1.0000,42,10.5000,1.0000,160,160,1.0000,bedrock,mistral.mistral-7b-instruct-v0:2

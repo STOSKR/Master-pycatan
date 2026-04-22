@@ -352,22 +352,58 @@ def _prepare_bedrock_credentials_from_env() -> None:
         os.environ.pop("AWS_ACCESS_KEY_ID", None)
 
 
+def _looks_like_url(value: str) -> bool:
+    normalized = (value or "").strip().lower()
+    return normalized.startswith("http://") or normalized.startswith("https://")
+
+
+def _normalize_upv_chat_endpoint(value: str) -> str:
+    candidate = (value or "").strip().strip('"').strip("'")
+    if not candidate:
+        return ""
+    if candidate.endswith("/chat/completions"):
+        return candidate
+    return candidate.rstrip("/") + "/chat/completions"
+
+
 def _resolve_upv_api_key() -> str:
     """
-    Resolves UPV API key from the preferred env var and accepted alias.
+    Resolves UPV API key from preferred env var and accepted alias.
     Priority:
     1) CATAN_UPV_API_KEY
-    2) API_UPV
+    2) API_UPV (only if it does not look like an URL)
     """
     canonical = os.getenv("CATAN_UPV_API_KEY", "").strip()
     if canonical:
         return canonical
 
     alias = os.getenv("API_UPV", "").strip()
-    if alias:
+    if alias and not _looks_like_url(alias):
         # Keep downstream tooling consistent once alias is used.
         os.environ.setdefault("CATAN_UPV_API_KEY", alias)
         return alias
+
+    return ""
+
+
+def _resolve_upv_chat_endpoint() -> str:
+    """
+    Resolves UPV chat endpoint from preferred env var and accepted alias.
+    Priority:
+    1) CATAN_UPV_CHAT_ENDPOINT
+    2) API_UPV (if it looks like an URL, interpreted as base URL)
+    """
+    canonical = os.getenv("CATAN_UPV_CHAT_ENDPOINT", "").strip()
+    if canonical:
+        normalized = _normalize_upv_chat_endpoint(canonical)
+        os.environ.setdefault("CATAN_UPV_CHAT_ENDPOINT", normalized)
+        return normalized
+
+    alias = os.getenv("API_UPV", "").strip()
+    if alias and _looks_like_url(alias):
+        normalized = _normalize_upv_chat_endpoint(alias)
+        os.environ.setdefault("CATAN_UPV_CHAT_ENDPOINT", normalized)
+        return normalized
 
     return ""
 
@@ -386,11 +422,13 @@ def build_provider_from_env() -> Optional[BaseLLMProvider]:
         return OllamaProvider(model=model, base_url=base_url)
 
     if provider == "upv":
-        chat_endpoint = os.getenv("CATAN_UPV_CHAT_ENDPOINT", "").strip()
+        chat_endpoint = _resolve_upv_chat_endpoint()
         api_key = _resolve_upv_api_key()
         if not (chat_endpoint and api_key and model):
             raise ProviderError(
-                "UPV provider requires CATAN_UPV_CHAT_ENDPOINT, CATAN_LLM_MODEL and CATAN_UPV_API_KEY (or API_UPV)"
+                "UPV provider requires CATAN_LLM_MODEL and both auth+endpoint: "
+                "CATAN_UPV_API_KEY plus CATAN_UPV_CHAT_ENDPOINT, "
+                "or API_UPV as compatible alias"
             )
         return UPVProvider(model=model, chat_endpoint=chat_endpoint, api_key=api_key)
 

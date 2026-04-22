@@ -1,0 +1,2 @@
+agent_path,agent_name,benchmark_type,seed,matches,wins,winrate,points_total,avg_points,avg_rank,llm_decisions,fallback_count,fallback_rate,provider,model
+PyCatan.Agents.ShiyiLLMAgent.ShiyiLLMAgent,ShiyiLLMAgent,vs_standard,42,100,87,0.8700,946,9.4600,1.2000,4766,2741,0.5751,upv,phi4-mini:3.8b

@@ -1,0 +1,3 @@
+provider,model,prompt_variant,benchmark_type,seed,matches,wins,winrate,avg_points,avg_rank,fallback_rate,llm_decisions,result_csv
+upv,phi4-mini:3.8b,compact_json,vs_random,42,4,4,1.0000,10.0000,1.0000,0.3988,168,A:\Master-pycatan\PyCatan\results\upv_llm\20260422_113211\model_phi4-mini_3_8b\prompt_compact_json\vs_random.csv
+upv,phi4-mini:3.8b,compact_json,vs_standard,42,4,4,1.0000,10.0000,1.0000,0.3590,195,A:\Master-pycatan\PyCatan\results\upv_llm\20260422_113211\model_phi4-mini_3_8b\prompt_compact_json\vs_standard.csv
