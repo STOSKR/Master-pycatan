@@ -44,6 +44,19 @@ Los experimentos heurísticos se ejecutaron con semillas reproducibles. En la ev
 
 Para facilitar la reproducibilidad, los resultados finales se guardaron en CSV dentro de \texttt{PyCatan/results}. Los experimentos heurísticos finales se encuentran en \texttt{results/heuristic\_final}; los experimentos LLM principales están en \texttt{results/bedrock\_llm}, \texttt{results/upv\_llm}, \texttt{results/llm\_phase2} y \texttt{results/llm\_light}. Las ejecuciones fijan semillas, número de partidas y máximo de rondas mediante variables de entorno, por lo que pueden repetirse sin cambiar el código del agente.
 
+La reproducción de la evaluación heurística final se realiza desde la raíz del repositorio con:
+\begin{verbatim}
+$agent='PyCatan.Agents.ShiyiHeuristicAgent.ShiyiHeuristicAgent'
+$env:CATAN_BENCH_AGENTS='[{"class":"'+$agent+'"}]'
+$env:CATAN_BENCH_SEEDS='42,2026,31415'
+$env:CATAN_BENCH_N_MATCHES='25'
+$env:CATAN_BENCH_N_MATCHES_PER_PERM='1'
+$env:CATAN_BENCH_MAX_PERMUTATIONS='25'
+python -m PyCatan.benchmark_vs_random
+python -m PyCatan.benchmark_vs_agentes_estandar
+\end{verbatim}
+Para los experimentos LLM se usan los scripts \texttt{run\_bedrock\_llm\_benchmarks.py}, \texttt{run\_upv\_llm\_benchmarks.py} y \texttt{run\_llm\_light\_matrix.py}, configurando \texttt{CATAN\_LLM\_PROVIDER}, \texttt{CATAN\_LLM\_MODEL} y las credenciales del proveedor correspondiente. La batería de pruebas se ejecuta con \texttt{python -m unittest discover -s PyCatan/Tests -p "test\_*.py"}.
+
 \section{Resultados del agente heurístico}
 La Tabla \ref{tab:iterativo} resume el experimento de ablación. La columna \textit{gate 70\%} indica si la configuración supera el requisito mínimo frente a agentes random.
 
@@ -159,6 +172,8 @@ También se obtuvieron resultados descartados. \texttt{mistral.mistral-7b-instru
 Los modelos de Bedrock fueron los más estables. \texttt{nova-lite-v1} ofreció buen rendimiento sin \textit{fallback} y \texttt{llama3.3-70b} obtuvo el mejor resultado frente a agentes estándar. UPV \texttt{llama-mini} también fue utilizable, aunque con un pequeño \textit{fallback} contra random. En local se detectaron dos modelos mediante Ollama: \texttt{qwen2.5:0.5b} y \texttt{gemma2:9b}. El modelo pequeño, ejecutado en local con una AMD 6600 XT, consiguió completar 100 partidas contra random sin \textit{fallback}, pero su rendimiento fue peor que Bedrock: 0.83 de \textit{winrate} y 9.21 puntos medios. Esto sugiere que responder JSON válido no garantiza buena política.
 
 La latencia local de \texttt{qwen2.5:0.5b} fue baja para un LLM: 488 ms medios por decisión en la ejecución completa contra random, con 8847 decisiones. Aun así, el coste total fue elevado porque se consulta el modelo muchas veces durante la partida. Por ello, una integración práctica debería reservar los LLM para decisiones de alto impacto o usarlos para generar heurísticas, no necesariamente para cada paso frecuente.
+
+En cuanto a tokens y coste, la instrumentación actual del motor registra \texttt{input\_tokens}, \texttt{output\_tokens}, latencia y \textit{fallback} cuando el proveedor los devuelve. La ejecución local completa con \texttt{qwen2.5:0.5b} promedió 356.64 tokens de entrada y 8.05 de salida por decisión. En Bedrock y UPV, las ejecuciones comparables usadas para la tabla principal se generaron con una versión anterior del resumen CSV que no persistía latencia ni tokens; por ese motivo, en esta memoria no se comparan numéricamente esos campos para dichos proveedores. Sí se comparan calidad de decisión, robustez de formato y facilidad de integración. Bedrock fue el más estable en formato y calidad, UPV resultó fácil de integrar con API tipo chat, y Ollama fue el más barato y controlable, aunque dependiente del hardware local y de modelos más débiles.
 
 \section{Viabilidad de los LLM en PyCatan}
 Los LLM pueden integrarse técnicamente en PyCatan, pero presentan tres riesgos. Primero, la salida estructurada no está garantizada: incluso con temperatura baja, algunos modelos devuelven índices fuera de rango o texto adicional. Segundo, la latencia multiplica el tiempo de benchmark. Tercero, si se permite \textit{fallback} silencioso, se sobreestima la calidad del modelo.

@@ -1,22 +1,25 @@
-import sys
-sys.path.append('..') # This is to add the parent directory to the path
-
-from PyCatan.Managers.GameDirector import GameDirector
-from PyCatan.Agents.RandomAgent import RandomAgent as ra
-from PyCatan.Agents.AdrianHerasAgent import AdrianHerasAgent as aha
-
-import random
 import json
+import random
+import unittest
+from pathlib import Path
 
-game_director = GameDirector(agents=(ra, ra, aha, aha), max_rounds=200)
-for i in range(100):
-    random.seed(i)
-    game_trace = game_director.game_start(i, False)
-    game_hash = hash(json.dumps(game_trace)) # convert to string because dict is not hashable
-    with open(f'./../Tests/test_traces/game_{i}.json', 'r') as f:
-        test_hash = hash(f.read())
-        if game_hash != test_hash:
-            print('Game {i}: ERROR')
-            break
-        
-    print(f'Game {i}: OK')
+from PyCatan.Agents.AdrianHerasAgent import AdrianHerasAgent as aha
+from PyCatan.Agents.RandomAgent import RandomAgent as ra
+from PyCatan.Managers.GameDirector import GameDirector
+
+
+class TestTraceComparison(unittest.TestCase):
+    def test_reference_traces_are_stable(self):
+        trace_dir = Path(__file__).resolve().parent / "test_traces"
+        game_director = GameDirector(agents=(ra, ra, aha, aha), max_rounds=200)
+
+        for i in range(100):
+            with self.subTest(game=i):
+                random.seed(i)
+                game_trace = game_director.game_start(i, False)
+                generated_hash = hash(json.dumps(game_trace))
+
+                reference_path = trace_dir / f"game_{i}.json"
+                reference_hash = hash(reference_path.read_text(encoding="utf-8"))
+
+                self.assertEqual(generated_hash, reference_hash)
