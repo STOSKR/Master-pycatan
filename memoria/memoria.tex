@@ -1,241 +1,140 @@
-\documentclass[11pt,a4paper]{article}
+﻿\documentclass[10pt,a4paper]{article}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage[spanish]{babel}
 \usepackage{geometry}
 \usepackage{booktabs}
-\usepackage{longtable}
 \usepackage{array}
 \usepackage{amsmath}
-\usepackage{hyperref}
 \usepackage{float}
-\geometry{margin=2.2cm}
+\usepackage{enumitem}
+\geometry{margin=1.8cm}
+\setlist[itemize]{noitemsep,topsep=2pt,leftmargin=*}
+\setlist[enumerate]{noitemsep,topsep=2pt,leftmargin=*}
+\renewcommand{\arraystretch}{1.08}
 
-\title{HAIA: Agentes para PyCatan}
-\author{Shiyi Cheng \and Codex}
-\date{\today}
+\title{Agentes heurísticos y modelos de lenguaje para PyCatan}
+\author{Shiyi Cheng}
+\date{Abril de 2026}
 
 \begin{document}
 \maketitle
 
-\section{Objetivo y estado actual}
-El objetivo del trabajo es desarrollar un agente para Catan y evaluarlo de forma experimental, cubriendo:
+\section{Objetivo}
+El objetivo de la práctica es diseñar, implementar y evaluar un agente inteligente para el simulador PyCatan. El trabajo se divide en dos partes. La primera desarrolla un agente heurístico clásico y lo compara con agentes \textit{random} y agentes estándar. La segunda integra modelos de lenguaje (LLM) en decisiones concretas del agente para estudiar si son viables como política de decisión dentro de una simulación multiagente.
+
+La aportación principal es doble: por un lado, un agente heurístico incremental con rendimiento claramente superior al aleatorio; por otro, una infraestructura experimental para comparar proveedores LLM, medir \textit{fallback}, latencia y calidad de decisión, y separar los resultados válidos de aquellos contaminados por decisiones de respaldo.
+
+\section{Diseño del agente heurístico}
+El agente heurístico se construyó de forma incremental, activando mejoras por bloques de decisión. Esta estructura permitió medir qué parte del comportamiento aporta más rendimiento. Las decisiones principales cubiertas son:
+
 \begin{itemize}
-\item Parte 1: agente heuristico y benchmarks frente a random y agentes estandar.
-\item Parte 2: integracion de LLM en dos decisiones del agente y analisis comparativo de prompts/modelos.
+\item \textbf{Colocación inicial}: evaluación de nodos por producción esperada, diversidad de recursos y calidad de la carretera inicial.
+\item \textbf{Construcción}: priorización dinámica de ciudad, pueblo, carretera y carta de desarrollo según recursos disponibles y estado del tablero.
+\item \textbf{Comercio}: uso de intercambios con la banca cuando permiten completar recursos críticos para el objetivo actual.
+\item \textbf{Ladrón y cartas}: reglas simples para no desperdiciar acciones y mantener una política estable.
 \end{itemize}
 
-En esta entrega parcial se ha completado de forma solida la Parte 1 y se ha dejado implementada la infraestructura de la Parte 2 (pipeline y agente LLM), aunque faltan experimentos finales con UPV y Bedrock para cerrar esa parte con datos definitivos.
+La heurística de nodos combina la probabilidad del dado con la variedad de recursos. En Catan, producir de forma regular y no depender de un único recurso suele ser más importante que maximizar una casilla aislada. Para la construcción, el agente intenta convertir recursos en puntos de victoria de forma temprana: primero ciudades si existen pueblos valiosos, después pueblos, carreteras y cartas. La carretera se valora por su capacidad de abrir nuevos nodos útiles.
 
-\section{Cambios implementados}
-\subsection{Refactor de benchmarks}
-Se unificaron los benchmarks en una infraestructura comun:
-\begin{itemize}
-\item \texttt{PyCatan/benchmark\_common.py}
-\item wrappers: \texttt{benchmark\_vs\_random.py} y \texttt{benchmark\_vs\_agentes\_estandar.py}
-\end{itemize}
+\section{Infraestructura experimental}
+Se refactorizaron los benchmarks en un módulo común, \texttt{benchmark\_common.py}, con wrappers para \texttt{vs\_random} y \texttt{vs\_standard}. La infraestructura genera CSV homogéneos con partidas, victorias, \textit{winrate}, puntos medios, rango medio, decisiones LLM, \textit{fallback} y proveedor/modelo cuando aplica.
 
-Mejoras introducidas:
-\begin{itemize}
-\item ejecucion reproducible por semillas multiples;
-\item misma estructura de metricas y CSV en ambos benchmarks;
-\item configuracion por variables de entorno para agentes, seeds, partidas y workers;
-\item soporte robusto en este entorno (fallback a \texttt{ThreadPoolExecutor} cuando \texttt{ProcessPoolExecutor} falla por permisos).
-\end{itemize}
+Los experimentos heurísticos se ejecutaron con semillas reproducibles. En la evaluación iterativa se usaron las semillas \texttt{42}, \texttt{31415} y \texttt{2026}, 25 partidas por posición contra random, es decir, 100 partidas por semilla. Para los experimentos LLM se utilizaron ejecuciones completas cuando el coste lo permitió y ejecuciones ligeras para los modelos locales.
 
-Campos homogeneos de salida: \texttt{wins}, \texttt{winrate}, \texttt{avg\_points}, \texttt{avg\_rank}, \texttt{fallback\_rate}, \texttt{provider}, \texttt{model}, \texttt{seed}.
-
-\subsection{Agente base incremental}
-Se implemento un nuevo tronco:
-\begin{itemize}
-\item \texttt{ShiyiBaseAgent}, que hereda de \texttt{RandomAgent}.
-\end{itemize}
-
-Este agente usa \textit{feature flags} por decision:
-\begin{itemize}
-\item \texttt{on\_game\_start}
-\item \texttt{on\_build\_phase}
-\item \texttt{on\_commerce\_phase}
-\item \texttt{on\_moving\_thief}
-\end{itemize}
-
-Si una mejora esta desactivada o falla en runtime, el comportamiento vuelve a random (fallback seguro).
-
-\subsection{Agente heuristico y agente LLM}
-\begin{itemize}
-\item \texttt{ShiyiHeuristicAgent} ahora extiende el tronco incremental.
-\item \texttt{ShiyiLLMAgent} mantiene la logica LLM y ahora acepta configuracion por diccionario (facilita barridos de prompts/modelos desde benchmark).
-\end{itemize}
-
-\section{Diseno de heuristicas (Parte 1)}
-El agente heuristico usa funciones de valor en:
-\begin{itemize}
-\item produccion esperada por nodo (ponderada por probabilidad de dado);
-\item diversidad de recursos;
-\item valor de expansion de carreteras;
-\item objetivo dinamico de construccion (ciudad, pueblo, carretera, carta);
-\item comercio con banca para cubrir escasez relevante.
-\end{itemize}
-
-La prioridad de construccion aplicada es:
-\[
-\text{ciudad} > \text{pueblo} > \text{carretera} > \text{carta}
-\]
-
-\section{Protocolo experimental}
-\subsection{Pipeline iterativo}
-Se implemento y ejecuto el pipeline:
-\begin{itemize}
-\item \texttt{iter0\_random\_baseline}
-\item \texttt{iter1\_game\_start}
-\item \texttt{iter2\_build\_phase}
-\item \texttt{iter3\_commerce\_trade}
-\item \texttt{iter4\_thief\_devcards}
-\end{itemize}
-
-Configuracion usada para el gate:
-\begin{itemize}
-\item seeds: \texttt{42, 31415, 2026}
-\item 25 partidas por posicion (100 por seed)
-\item criterio: media de \texttt{winrate} \(\geq 0.70\) vs random
-\end{itemize}
-
-Resultado consolidado: \texttt{PyCatan/benchmark\_iterative\_summary.csv}
-
-\section{Resultados}
-\subsection{Ablation (vs random)}
-\begin{table}[H]
-\centering
-\begin{tabular}{lrrr}
-\toprule
-Iteracion & Media winrate & Desv. tipica & Min seed \\
-\midrule
-iter0\_random\_baseline & 0.2733 & 0.0047 & 0.2700 \\
-iter1\_game\_start & 0.2800 & 0.0294 & 0.2500 \\
-iter2\_build\_phase & 0.8433 & 0.0499 & 0.7900 \\
-iter3\_commerce\_trade & 1.0000 & 0.0000 & 1.0000 \\
-iter4\_thief\_devcards & 1.0000 & 0.0000 & 1.0000 \\
-\bottomrule
-\end{tabular}
-\caption{Resumen del pipeline iterativo contra random.}
-\end{table}
-
-Conclusiones directas:
-\begin{itemize}
-\item El mayor salto aparece en \texttt{iter2} al activar \texttt{on\_build\_phase}.
-\item \texttt{iter3} y \texttt{iter4} alcanzan 100\% en las seeds del gate.
-\item El requisito de 70\% se supera claramente desde \texttt{iter2}.
-\end{itemize}
-
-\subsection{Validacion fuera de muestra (vs random)}
-Para comprobar que el 100\% no era un artefacto de las seeds del gate, se ejecuto una validacion extra con seeds no usadas en el diseno:
-\[
-\texttt{7, 99, 12345}
-\]
-
-Fuente: \texttt{PyCatan/benchmark\_vs\_random\_resultados.csv}
+\section{Resultados del agente heurístico}
+La Tabla \ref{tab:iterativo} resume el experimento de ablación. La columna \textit{gate 70\%} indica si la configuración supera el requisito mínimo frente a agentes random.
 
 \begin{table}[H]
 \centering
-\begin{tabular}{lrrr}
+\small
+\begin{tabular}{lrrrr}
 \toprule
-Seed & Partidas & Victorias & Winrate \\
+Iteración & Media winrate & Desv. típica & Mínimo & Gate 70\% \\
 \midrule
-7 & 100 & 100 & 1.0000 \\
-99 & 100 & 100 & 1.0000 \\
-12345 & 100 & 100 & 1.0000 \\
+iter0 random baseline & 0.2733 & 0.0047 & 0.2700 & No \\
+iter1 game start & 0.2800 & 0.0294 & 0.2500 & No \\
+iter2 build phase & 0.8433 & 0.0499 & 0.7900 & Sí \\
+iter3 commerce trade & 1.0000 & 0.0000 & 1.0000 & Sí \\
+iter4 thief devcards & 1.0000 & 0.0000 & 1.0000 & Sí \\
 \bottomrule
 \end{tabular}
-\caption{Iteracion 4 contra random, seeds fuera del conjunto original.}
+\caption{Resumen del pipeline iterativo frente a agentes random. Fuente: \texttt{results/iterative/benchmark\_iterative\_summary.csv}.}
+\label{tab:iterativo}
 \end{table}
 
-\subsection{Comparacion contra agentes estandar}
-\subsubsection{Iteracion 2 (gate minimo, primer estado competitivo)}
-Fuente: \texttt{PyCatan/iter2\_build\_phase\_benchmark\_vs\_estandar\_resultados.csv}
+El salto más importante aparece al activar \texttt{on\_build\_phase}. Esto confirma que, en este simulador, convertir recursos en construcciones de forma coherente es más decisivo que mejorar únicamente la colocación inicial. La fase de comercio termina de cerrar el comportamiento: al desbloquear intercambios orientados a objetivos, el agente alcanza 100\% de victorias contra random en las semillas del gate.
+
+Frente a agentes estándar, la primera versión competitiva evaluada fue \texttt{iter2\_build\_phase}. Sus resultados aparecen en la Tabla \ref{tab:std}. Aunque ya supera ampliamente al random, el rendimiento frente a agentes más fuertes todavía no es dominante, lo que muestra que el comercio y los módulos posteriores no son cosméticos.
 
 \begin{table}[H]
 \centering
-\begin{tabular}{lrrr}
+\small
+\begin{tabular}{rrrrr}
 \toprule
-Seed & Partidas & Victorias & Winrate \\
+Seed & Partidas & Victorias & Winrate & Puntos medios \\
 \midrule
-42 & 500 & 203 & 0.4060 \\
-2026 & 500 & 180 & 0.3600 \\
-31415 & 500 & 209 & 0.4180 \\
+42 & 500 & 203 & 0.4060 & 6.5140 \\
+2026 & 500 & 180 & 0.3600 & 6.2820 \\
+31415 & 500 & 209 & 0.4180 & 6.5680 \\
 \bottomrule
 \end{tabular}
-\caption{Iteracion 2 contra estandar.}
+\caption{Iteración 2 frente a agentes estándar. Fuente: CSV de la iteración 2 en \texttt{results/iterative}.}
+\label{tab:std}
 \end{table}
 
-\subsubsection{Iteracion 4 (estado actual)}
-Fuente: \texttt{PyCatan/benchmark\_vs\_estandar\_resultados.csv}
+\section{Integración de LLM}
+El agente LLM se implementó como una variante de \texttt{ShiyiHeuristicAgent}. El modelo se consulta en dos decisiones: \texttt{on\_game\_start} y \texttt{on\_build\_phase}. En cada llamada se envía el estado mínimo necesario, una lista indexada de acciones legales y una instrucción para devolver JSON con el campo \texttt{action\_index}. Si la respuesta es inválida, fuera de rango o no llega a tiempo, el sistema registra \textit{fallback} y usa la acción heurística.
+
+Se diseñaron tres variantes de prompt: \texttt{compact\_json}, \texttt{resource\_focus} y \texttt{safe\_legal}. Los experimentos finales se concentraron en \texttt{compact\_json}, porque es el formato más corto y el que mejor encaja con el requisito de respuesta estructurada. Durante las pruebas locales se detectó un fallo importante: algunos modelos pequeños tendían a copiar el JSON de entrada o a confundir \texttt{action\_index} con \texttt{node\_id}. Para corregirlo, el prompt pasó a usar acciones explícitamente indexadas y la restricción de que \texttt{action\_index} no es ni \texttt{node\_id}, ni \texttt{road\_to}, ni tipo de construcción.
+
+\section{Resultados LLM}
+La Tabla \ref{tab:llm} recoge los resultados comparables disponibles. Se marca como inválido cualquier resultado con \textit{fallback} alto, porque en ese caso la política real no es el LLM, sino la heurística de respaldo.
 
 \begin{table}[H]
 \centering
-\begin{tabular}{lrrr}
+\scriptsize
+\begin{tabular}{llllrrrrl}
 \toprule
-Seed & Partidas & Victorias & Winrate \\
+Proveedor & Modelo & Benchmark & Prompt & Partidas & Winrate & Avg pts & Fallback & Uso \\
 \midrule
-42 & 500 & 460 & 0.9200 \\
-2026 & 500 & 451 & 0.9020 \\
-31415 & 500 & 454 & 0.9080 \\
+Bedrock & nova-lite-v1 & random & compact & 100 & 1.0000 & 10.04 & 0.0000 & válido \\
+Bedrock & nova-lite-v1 & standard & compact & 100 & 0.9100 & 9.75 & 0.0000 & válido \\
+Bedrock & llama3.3-70b & random & compact & 100 & 1.0000 & 10.12 & 0.0002 & válido \\
+Bedrock & llama3.3-70b & standard & compact & 100 & 0.9400 & 9.77 & 0.0002 & válido \\
+UPV & llama-mini & random & compact & 100 & 1.0000 & 10.05 & 0.0143 & aceptable \\
+UPV & llama-mini & standard & compact & 100 & 0.9000 & 9.63 & 0.0000 & válido \\
+Ollama & qwen2.5:0.5b & random & compact & 100 & 0.8300 & 9.21 & 0.0000 & válido parcial \\
+Ollama & qwen2.5:0.5b & standard & compact & 4 & 0.2500 & 4.75 & 0.0000 & smoke test \\
 \bottomrule
 \end{tabular}
-\caption{Iteracion 4 contra estandar.}
+\caption{Resultados LLM principales. Fuentes: \texttt{results/bedrock\_llm/20260422\_093854}, \texttt{results/upv\_llm/20260422\_120019} y \texttt{results/llm\_light/20260424\_124431}.}
+\label{tab:llm}
 \end{table}
 
-\section{Analisis: por que aparece winrate=1.0 en iteracion 4}
-No es un error de formato del CSV: en los experimentos mostrados se observan \texttt{wins=matches} y \texttt{avg\_rank=1.0000}.
+También se obtuvieron resultados descartados. \texttt{mistral.mistral-7b-instruct-v0:2} en Bedrock registró \textit{fallback\_rate}=1.0, por lo que sus victorias no pueden atribuirse al modelo. En UPV, \texttt{phi4-mini:3.8b} presentó \textit{fallback} de 0.4288 contra random y 0.5751 contra estándar, de modo que tampoco es una configuración fiable. En Ollama, una ejecución antigua de \texttt{gemma2:9b} produjo 0.9745 de \textit{fallback}; después de corregir el prompt, las llamadas directas ya respondían JSON válido, pero no se completó un benchmark limpio. Estos descartes son importantes: si se ignora el \textit{fallback}, el CSV puede mostrar victorias que realmente pertenecen al agente heurístico.
 
-Interpretacion mas plausible con los datos actuales:
-\begin{itemize}
-\item el agente random del simulador es muy debil frente a una politica heuristica de construccion/comercio bien orientada;
-\item el salto principal viene de activar construccion y comercio (iter2 e iter3), no del modulo thief/development cards;
-\item el resultado se mantiene en seeds nuevas, por lo que no parece sobreajuste a las 3 semillas iniciales.
-\end{itemize}
+\section{Análisis de modelos}
+Los modelos de Bedrock fueron los más estables. \texttt{nova-lite-v1} ofreció buen rendimiento sin \textit{fallback} y \texttt{llama3.3-70b} obtuvo el mejor resultado frente a agentes estándar. UPV \texttt{llama-mini} también fue utilizable, aunque con un pequeño \textit{fallback} contra random. En local se detectaron dos modelos mediante Ollama: \texttt{qwen2.5:0.5b} y \texttt{gemma2:9b}. El modelo pequeño, ejecutado en local con una AMD 6600 XT, consiguió completar 100 partidas contra random sin \textit{fallback}, pero su rendimiento fue peor que Bedrock: 0.83 de \textit{winrate} y 9.21 puntos medios. Esto sugiere que responder JSON válido no garantiza buena política.
 
-Importante: este 100\% se da \textbf{contra random}. Contra estandar, en el estado actual, el rendimiento ya no es perfecto pero sigue siendo alto (alrededor de 90\% en este entorno y esta configuracion).
+La latencia local de \texttt{qwen2.5:0.5b} fue baja para un LLM: 488 ms medios por decisión en la ejecución completa contra random, con 8847 decisiones. Aun así, el coste total fue elevado porque se consulta el modelo muchas veces durante la partida. Por ello, una integración práctica debería reservar los LLM para decisiones de alto impacto o usarlos para generar heurísticas, no necesariamente para cada paso frecuente.
 
-\section{Parte 2 (LLM): estado actual}
-Se ha implementado la infraestructura necesaria:
-\begin{itemize}
-\item decision LLM en \texttt{on\_game\_start} y \texttt{on\_build\_phase};
-\item prompts: \texttt{compact\_json}, \texttt{resource\_focus}, \texttt{safe\_legal};
-\item script de evaluacion ligera: \texttt{PyCatan/evaluate\_llm\_phase2.py};
-\item soporte de proveedores \texttt{upv} y \texttt{bedrock} en el motor.
-\end{itemize}
+\section{Viabilidad de los LLM en PyCatan}
+Los LLM pueden integrarse técnicamente en PyCatan, pero presentan tres riesgos. Primero, la salida estructurada no está garantizada: incluso con temperatura baja, algunos modelos devuelven índices fuera de rango o texto adicional. Segundo, la latencia multiplica el tiempo de benchmark. Tercero, si se permite \textit{fallback} silencioso, se sobreestima la calidad del modelo.
 
-Pendiente para cerrar la rubrica de Parte 2:
-\begin{itemize}
-\item ejecutar y documentar al menos 3 modelos distintos con datos finales;
-\item incluir comparativa de latencia/tokens/calidad/fallback entre prompts y proveedores.
-\end{itemize}
+La conclusión experimental es que los LLM grandes y bien servidos funcionan como política aproximada para decisiones acotadas, especialmente cuando reciben una lista de acciones legales. Sin embargo, para un agente competitivo, la heurística sigue siendo más barata, reproducible y fácil de depurar. El uso más razonable del LLM sería como apoyo en decisiones estratégicas poco frecuentes, generación de explicaciones o exploración de variantes heurísticas, no como sustituto completo de la política del agente.
 
 \section{Uso de herramientas de IA}
-Durante el desarrollo se usaron asistentes de IA para:
-\begin{itemize}
-\item refactorizar benchmarks y estandarizar metricas;
-\item implementar el tronco incremental con fallback seguro;
-\item preparar experimentacion iterativa y scripts de evaluacion LLM;
-\item redactar y revisar analisis de resultados.
-\end{itemize}
-
-Las decisiones de diseno y la validacion se apoyaron en ejecuciones reales y revision manual de resultados CSV.
+Durante el desarrollo se usaron asistentes de programación basados en IA para refactorizar benchmarks, diseñar el pipeline experimental, implementar el motor LLM, depurar errores de formato JSON y redactar esta memoria. Su utilidad principal fue acelerar tareas de integración y análisis. La limitación más clara apareció precisamente en la experimentación LLM: una salida aparentemente correcta puede esconder \textit{fallback}, por lo que fue necesario validar con CSV, métricas y pruebas manuales.
 
 \section{Conclusiones}
 \begin{enumerate}
-\item La Parte 1 esta conseguida con evidencia experimental fuerte: el objetivo de \( \geq 70\% \) vs random se supera ampliamente.
-\item El pipeline iterativo permite justificar que mejoras aportan mas rendimiento (especialmente build y commerce).
-\item El resultado de 100\% vs random en iteraciones avanzadas es consistente en varias seeds, incluidas seeds fuera del conjunto inicial.
-\item Contra agentes estandar, el rendimiento en el estado actual es alto, lo que confirma que las mejoras no solo explotan debilidades triviales del random.
-\item La Parte 2 esta implementada a nivel tecnico, pero requiere cerrar la experimentacion con modelos UPV/Bedrock para completar la practica al 100\%.
+\item El agente heurístico supera ampliamente el objetivo de 70\% frente a random desde la iteración de construcción, y alcanza 100\% al añadir comercio en las semillas evaluadas.
+\item La ablación muestra que \texttt{on\_build\_phase} es la mejora más decisiva; el comercio consolida el rendimiento.
+\item La integración LLM funciona en dos decisiones reales del agente: colocación inicial y construcción.
+\item Bedrock \texttt{nova-lite-v1} y \texttt{llama3.3-70b} son las configuraciones más sólidas entre las evaluadas.
+\item Ollama local es viable técnicamente, pero los modelos pequeños requieren prompts muy estrictos y aun así ofrecen menor calidad de decisión.
+\item El \textit{fallback} debe tratarse como métrica crítica. Los resultados con \textit{fallback} alto no son válidos para comparar modelos.
 \end{enumerate}
-
-\section{Trabajo pendiente inmediato}
-\begin{itemize}
-\item ejecutar matriz final de Parte 2 (>=3 modelos, >=3 prompts, proveedores UPV/Bedrock);
-\item incorporar tabla final de latencia, tokens y fallback por configuracion;
-\item ajustar autores, revisar estilo final y limitar a maximo 10 paginas.
-\end{itemize}
 
 \end{document}

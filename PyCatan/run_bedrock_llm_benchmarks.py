@@ -66,6 +66,38 @@ def _validate_env() -> List[str]:
     return missing
 
 
+def _summary_row(
+    row: Dict[str, str],
+    provider: str,
+    model: str,
+    prompt: str,
+    benchmark_type: str,
+    result_csv: str,
+) -> Dict[str, str]:
+    return {
+        "provider": provider,
+        "model": model,
+        "prompt_variant": prompt,
+        "benchmark_type": benchmark_type,
+        "seed": str(row["seed"]),
+        "matches": str(row["matches"]),
+        "wins": str(row["wins"]),
+        "winrate": str(row["winrate"]),
+        "avg_points": str(row["avg_points"]),
+        "avg_rank": str(row["avg_rank"]),
+        "fallback_rate": str(row["fallback_rate"]),
+        "llm_decisions": str(row["llm_decisions"]),
+        "latency_ms_total": str(row["latency_ms_total"]),
+        "avg_latency_ms": str(row["avg_latency_ms"]),
+        "input_tokens_total": str(row["input_tokens_total"]),
+        "output_tokens_total": str(row["output_tokens_total"]),
+        "token_decisions": str(row["token_decisions"]),
+        "avg_input_tokens": str(row["avg_input_tokens"]),
+        "avg_output_tokens": str(row["avg_output_tokens"]),
+        "result_csv": result_csv,
+    }
+
+
 if __name__ == "__main__":
     load_repo_env_file()
     _ensure_default_budgets()
@@ -133,40 +165,19 @@ if __name__ == "__main__":
 
             for row in random_rows:
                 summary_rows.append(
-                    {
-                        "provider": "bedrock",
-                        "model": model,
-                        "prompt_variant": prompt,
-                        "benchmark_type": "vs_random",
-                        "seed": str(row["seed"]),
-                        "matches": str(row["matches"]),
-                        "wins": str(row["wins"]),
-                        "winrate": str(row["winrate"]),
-                        "avg_points": str(row["avg_points"]),
-                        "avg_rank": str(row["avg_rank"]),
-                        "fallback_rate": str(row["fallback_rate"]),
-                        "llm_decisions": str(row["llm_decisions"]),
-                        "result_csv": str(random_path),
-                    }
+                    _summary_row(row, "bedrock", model, prompt, "vs_random", str(random_path))
                 )
 
             for row in standard_rows:
                 summary_rows.append(
-                    {
-                        "provider": "bedrock",
-                        "model": model,
-                        "prompt_variant": prompt,
-                        "benchmark_type": "vs_standard",
-                        "seed": str(row["seed"]),
-                        "matches": str(row["matches"]),
-                        "wins": str(row["wins"]),
-                        "winrate": str(row["winrate"]),
-                        "avg_points": str(row["avg_points"]),
-                        "avg_rank": str(row["avg_rank"]),
-                        "fallback_rate": str(row["fallback_rate"]),
-                        "llm_decisions": str(row["llm_decisions"]),
-                        "result_csv": str(standard_path),
-                    }
+                    _summary_row(
+                        row,
+                        "bedrock",
+                        model,
+                        prompt,
+                        "vs_standard",
+                        str(standard_path),
+                    )
                 )
 
     summary_path = base_abs / "summary.csv"
@@ -186,6 +197,13 @@ if __name__ == "__main__":
                 "avg_rank",
                 "fallback_rate",
                 "llm_decisions",
+                "latency_ms_total",
+                "avg_latency_ms",
+                "input_tokens_total",
+                "output_tokens_total",
+                "token_decisions",
+                "avg_input_tokens",
+                "avg_output_tokens",
                 "result_csv",
             ],
         )

@@ -76,6 +76,7 @@ class ShiyiLLMAgent(ShiyiHeuristicAgent):
                 "fallback": outcome.used_fallback,
                 "reason": outcome.reason,
                 "selected_index": outcome.selected_index,
+                "raw_response_preview": outcome.raw_response[:500],
                 "input_tokens": outcome.input_tokens,
                 "output_tokens": outcome.output_tokens,
             }

@@ -1,0 +1,2 @@
+agent_path,agent_name,benchmark_type,seed,matches,wins,winrate,points_total,avg_points,avg_rank,llm_decisions,fallback_count,fallback_rate,latency_ms_total,avg_latency_ms,input_tokens_total,output_tokens_total,token_decisions,avg_input_tokens,avg_output_tokens,provider,model
+PyCatan.Agents.ShiyiLLMAgent.ShiyiLLMAgent,ShiyiLLMAgent,vs_random,42,100,83,0.8300,921,9.2100,1.3500,8847,0,0.0000,4321359,488.45,3155195,71218,8847,356.64,8.05,ollama,qwen2.5:0.5b

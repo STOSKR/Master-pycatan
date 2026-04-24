@@ -96,6 +96,13 @@ if __name__ == "__main__":
                     "avg_rank": str(row["avg_rank"]),
                     "fallback_rate": str(row["fallback_rate"]),
                     "llm_decisions": str(row["llm_decisions"]),
+                    "latency_ms_total": str(row["latency_ms_total"]),
+                    "avg_latency_ms": str(row["avg_latency_ms"]),
+                    "input_tokens_total": str(row["input_tokens_total"]),
+                    "output_tokens_total": str(row["output_tokens_total"]),
+                    "token_decisions": str(row["token_decisions"]),
+                    "avg_input_tokens": str(row["avg_input_tokens"]),
+                    "avg_output_tokens": str(row["avg_output_tokens"]),
                 }
             )
 
@@ -115,6 +122,13 @@ if __name__ == "__main__":
                 "avg_rank",
                 "fallback_rate",
                 "llm_decisions",
+                "latency_ms_total",
+                "avg_latency_ms",
+                "input_tokens_total",
+                "output_tokens_total",
+                "token_decisions",
+                "avg_input_tokens",
+                "avg_output_tokens",
             ],
         )
         writer.writeheader()

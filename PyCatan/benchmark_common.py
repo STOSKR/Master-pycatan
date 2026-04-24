@@ -49,6 +49,13 @@ BENCHMARK_SUMMARY_FIELDS = [
     "llm_decisions",
     "fallback_count",
     "fallback_rate",
+    "latency_ms_total",
+    "avg_latency_ms",
+    "input_tokens_total",
+    "output_tokens_total",
+    "token_decisions",
+    "avg_input_tokens",
+    "avg_output_tokens",
     "provider",
     "model",
 ]
@@ -225,16 +232,47 @@ def extract_match_outcome(game_director: GameDirector, position: int):
 
     decision_count = 0
     fallback_count = 0
+    latency_ms_total = 0
+    input_tokens_total = 0
+    output_tokens_total = 0
+    token_decisions = 0
     try:
         agent_obj = game_director.game_manager.agent_manager.players[position]["player"]
         if hasattr(agent_obj, "get_llm_decision_history"):
             history = agent_obj.get_llm_decision_history()
             decision_count = len(history)
             fallback_count = sum(1 for item in history if item.get("fallback"))
+            latency_ms_total = sum(int(item.get("latency_ms") or 0) for item in history)
+            input_tokens_total = sum(
+                int(item["input_tokens"])
+                for item in history
+                if item.get("input_tokens") is not None
+            )
+            output_tokens_total = sum(
+                int(item["output_tokens"])
+                for item in history
+                if item.get("output_tokens") is not None
+            )
+            token_decisions = sum(
+                1
+                for item in history
+                if item.get("input_tokens") is not None
+                or item.get("output_tokens") is not None
+            )
     except Exception:
         pass
 
-    return victory, points, rank, decision_count, fallback_count
+    return (
+        victory,
+        points,
+        rank,
+        decision_count,
+        fallback_count,
+        latency_ms_total,
+        input_tokens_total,
+        output_tokens_total,
+        token_decisions,
+    )
 
 
 def simulate_match(
@@ -261,7 +299,7 @@ def simulate_match(
     except Exception as exc:
         print("Exception:", repr(exc))
         print(traceback.format_exc())
-        return (0, 0, 4, 0, 0)
+        return (0, 0, 4, 0, 0, 0, 0, 0, 0)
 
 
 def initialize_results(agent_specs: Sequence[Tuple[str, Optional[Any]]], seeds: Sequence[int]):
@@ -275,6 +313,10 @@ def initialize_results(agent_specs: Sequence[Tuple[str, Optional[Any]]], seeds: 
                 "rank_sum": 0,
                 "decisions": 0,
                 "fallback_count": 0,
+                "latency_ms_total": 0,
+                "input_tokens_total": 0,
+                "output_tokens_total": 0,
+                "token_decisions": 0,
                 "matches": 0,
             }
     return results
@@ -301,11 +343,18 @@ def _finalize_summary_rows(
             rank_sum = float(stats["rank_sum"])
             decisions = int(stats["decisions"])
             fallback_count = int(stats["fallback_count"])
+            latency_ms_total = int(stats["latency_ms_total"])
+            input_tokens_total = int(stats["input_tokens_total"])
+            output_tokens_total = int(stats["output_tokens_total"])
+            token_decisions = int(stats["token_decisions"])
 
             winrate = (wins / matches) if matches else 0.0
             avg_points = (points / matches) if matches else 0.0
             avg_rank = (rank_sum / matches) if matches else 0.0
             fallback_rate = (fallback_count / decisions) if decisions else 0.0
+            avg_latency_ms = (latency_ms_total / decisions) if decisions else 0.0
+            avg_input_tokens = (input_tokens_total / token_decisions) if token_decisions else 0.0
+            avg_output_tokens = (output_tokens_total / token_decisions) if token_decisions else 0.0
 
             summary_rows.append(
                 {
@@ -322,6 +371,13 @@ def _finalize_summary_rows(
                     "llm_decisions": decisions,
                     "fallback_count": fallback_count,
                     "fallback_rate": f"{fallback_rate:.4f}",
+                    "latency_ms_total": latency_ms_total,
+                    "avg_latency_ms": f"{avg_latency_ms:.2f}",
+                    "input_tokens_total": input_tokens_total,
+                    "output_tokens_total": output_tokens_total,
+                    "token_decisions": token_decisions,
+                    "avg_input_tokens": f"{avg_input_tokens:.2f}",
+                    "avg_output_tokens": f"{avg_output_tokens:.2f}",
                     "provider": llm_provider if decisions > 0 else "",
                     "model": llm_model if decisions > 0 else "",
                 }
@@ -421,13 +477,27 @@ def run_benchmark_vs_random(
 
         for future in concurrent.futures.as_completed(future_map):
             identifier, seed = future_map[future]
-            victory, points, rank, decisions, fallback_count = future.result()
+            (
+                victory,
+                points,
+                rank,
+                decisions,
+                fallback_count,
+                latency_ms_total,
+                input_tokens_total,
+                output_tokens_total,
+                token_decisions,
+            ) = future.result()
             stats = results[(identifier, seed)]
             stats["wins"] += victory
             stats["points"] += points
             stats["rank_sum"] += rank
             stats["decisions"] += decisions
             stats["fallback_count"] += fallback_count
+            stats["latency_ms_total"] += latency_ms_total
+            stats["input_tokens_total"] += input_tokens_total
+            stats["output_tokens_total"] += output_tokens_total
+            stats["token_decisions"] += token_decisions
             stats["matches"] += 1
             completed += 1
             if completed % 200 == 0 or completed == len(tasks):
@@ -542,13 +612,27 @@ def run_benchmark_vs_standard(
 
         for future in concurrent.futures.as_completed(future_map):
             identifier, seed = future_map[future]
-            victory, points, rank, decisions, fallback_count = future.result()
+            (
+                victory,
+                points,
+                rank,
+                decisions,
+                fallback_count,
+                latency_ms_total,
+                input_tokens_total,
+                output_tokens_total,
+                token_decisions,
+            ) = future.result()
             stats = results[(identifier, seed)]
             stats["wins"] += victory
             stats["points"] += points
             stats["rank_sum"] += rank
             stats["decisions"] += decisions
             stats["fallback_count"] += fallback_count
+            stats["latency_ms_total"] += latency_ms_total
+            stats["input_tokens_total"] += input_tokens_total
+            stats["output_tokens_total"] += output_tokens_total
+            stats["token_decisions"] += token_decisions
             stats["matches"] += 1
             completed += 1
             if completed % 1000 == 0 or completed == len(tasks):

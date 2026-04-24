@@ -29,25 +29,36 @@ def build_llm_messages(
     header, guidance = PROMPT_VARIANTS.get(variant, PROMPT_VARIANTS["compact_json"])
 
     system_prompt = (
-        "You are a deterministic Catan policy assistant. "
-        "You must return only valid JSON with this schema: "
-        '{"action_index": <int>, "confidence": <float 0-1 optional>}. '
-        "Do not include markdown or additional text."
+        "You are a deterministic Catan policy assistant. Return only one JSON object. "
+        "The JSON schema is exactly: "
+        '{"action_index": <integer>, "confidence": <number optional>}. '
+        "Do not repeat the input, do not use markdown, and do not add explanations."
     )
 
-    payload = {
-        "decision_name": decision_name,
-        "state": state,
-        "legal_actions": legal_actions,
-        "instruction": {
-            "goal": header,
-            "guidance": guidance,
-            "constraints": [
-                "action_index must point to an existing legal action",
-                "never invent actions outside legal_actions",
-            ],
-        },
-    }
+    max_index = len(legal_actions) - 1
+    valid_indexes = ", ".join(str(index) for index in range(len(legal_actions)))
+    state_json = json.dumps(state, separators=(",", ":"), ensure_ascii=True)
+    indexed_actions = [
+        {"action_index": index, "action": action}
+        for index, action in enumerate(legal_actions)
+    ]
+    actions_json = json.dumps(indexed_actions, separators=(",", ":"), ensure_ascii=True)
 
-    user_prompt = json.dumps(payload, separators=(",", ":"), ensure_ascii=True)
+    # Text labels keep small local models from copying a full JSON payload as the answer.
+    user_prompt = "\n".join(
+        [
+            "TASK: Choose one legal Catan action by index.",
+            f"DECISION_NAME: {decision_name}",
+            f"GOAL: {header}",
+            f"GUIDANCE: {guidance}",
+            f"VALID_INDEXES: {valid_indexes}",
+            f"INDEX_RANGE: 0..{max_index}",
+            f"STATE_JSON: {state_json}",
+            f"INDEXED_LEGAL_ACTIONS_JSON: {actions_json}",
+            'OUTPUT_JSON_ONLY_EXAMPLE: {"action_index": 0}',
+            "CONSTRAINT: action_index must be one of VALID_INDEXES.",
+            "CONSTRAINT: action_index is the small list index, not node_id, road_to, or building.",
+            "CONSTRAINT: never invent actions outside INDEXED_LEGAL_ACTIONS_JSON.",
+        ]
+    )
     return system_prompt, user_prompt
