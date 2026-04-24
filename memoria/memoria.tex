@@ -23,22 +23,39 @@
 \section{Objetivo}
 El objetivo de la práctica es diseñar, implementar y evaluar un agente inteligente para el simulador PyCatan. El trabajo se divide en dos partes. La primera desarrolla un agente heurístico clásico y lo compara con agentes \textit{random} y agentes estándar. La segunda integra modelos de lenguaje (LLM) en decisiones concretas del agente para estudiar si son viables como política de decisión dentro de una simulación multiagente.
 
-La aportación principal es doble: por un lado, un agente heurístico incremental con rendimiento claramente superior al aleatorio; por otro, una infraestructura experimental para comparar proveedores LLM, medir \textit{fallback}, latencia y calidad de decisión, y separar los resultados válidos de aquellos contaminados por decisiones de respaldo.
+La aportación principal es doble: por un lado, un agente heurístico incremental con rendimiento superior al aleatorio en los benchmarks ejecutados; por otro, una infraestructura experimental para comparar proveedores LLM, medir \textit{fallback}, latencia y calidad de decisión, y separar los resultados válidos de aquellos contaminados por decisiones de respaldo.
 
 \section{Diseño del agente heurístico}
 El agente heurístico se construyó de forma incremental, activando mejoras por bloques de decisión. Esta estructura permitió medir qué parte del comportamiento aporta más rendimiento. Las decisiones principales cubiertas son:
 
 \begin{itemize}
 \item \textbf{Colocación inicial}: evaluación de nodos por producción esperada, diversidad de recursos y calidad de la carretera inicial.
-\item \textbf{Construcción}: priorización dinámica de ciudad, pueblo, carretera y carta de desarrollo según recursos disponibles y estado del tablero.
+\item \textbf{Construcción}: priorización ordenada de ciudad, pueblo, carretera y carta de desarrollo, eligiendo el mejor destino legal en cada caso.
 \item \textbf{Comercio}: uso de intercambios con la banca cuando permiten completar recursos críticos para el objetivo actual.
 \item \textbf{Ladrón y cartas}: reglas simples para no desperdiciar acciones y mantener una política estable.
 \end{itemize}
 
-La heurística de nodos combina la probabilidad del dado con la variedad de recursos. En Catan, producir de forma regular y no depender de un único recurso suele ser más importante que maximizar una casilla aislada. Para la construcción, el agente intenta convertir recursos en puntos de victoria de forma temprana: primero ciudades si existen pueblos valiosos, después pueblos, carreteras y cartas. La carretera se valora por su capacidad de abrir nuevos nodos útiles.
+La heurística de nodos combina la probabilidad del dado con la variedad de recursos. En Catan, producir de forma regular y no depender de un único recurso suele ser más importante que maximizar una casilla aislada. Para la construcción, el agente sigue una prioridad práctica ciudad $>$ pueblo $>$ carretera $>$ carta y, dentro de cada tipo, elige el mejor destino legal según la puntuación heurística del tablero. La carretera se valora por su capacidad de abrir nuevos nodos útiles.
+
+\begin{table}[H]
+\centering
+\scriptsize
+\begin{tabular}{p{2.2cm}p{3.2cm}p{4.3cm}p{3.1cm}}
+\toprule
+Decisión & Información usada & Regla principal & Objetivo \\
+\midrule
+Colocación inicial & Probabilidades de los terrenos adyacentes, diversidad de recursos, puerto y carácter costero/interior & Puntuar nodos por producción esperada y variedad; desempatar con la calidad expansiva de la carretera inicial & Empezar con producción sólida y opciones de crecimiento \\
+Construcción & Recursos en mano, nodos/carreteras legales y puntuación heurística del tablero & Prioridad fija ciudad $>$ pueblo $>$ carretera $>$ carta, evaluando el mejor destino legal en cada caso & Convertir recursos en puntos y expansión útil \\
+Comercio con banca & Recursos disponibles, coste del objetivo actual y tasa de puerto aplicable & Cambiar un recurso con superávit por el recurso más escaso del objetivo seleccionado & Completar antes la construcción objetivo \\
+Ladrón y cartas & Terrenos con rivales adyacentes, escasez de recursos propia y acciones legales & Penalizar bloquearse a sí mismo, priorizar rivales bien posicionados y elegir materiales según carencias ponderadas & Evitar acciones desperdiciadas y mantener consistencia estratégica \\
+\bottomrule
+\end{tabular}
+\caption{Resumen de las decisiones heurísticas implementadas.}
+\label{tab:heuristicas}
+\end{table}
 
 \section{Infraestructura experimental}
-Se refactorizaron los benchmarks en un módulo común, \texttt{benchmark\_common.py}, con wrappers para \texttt{vs\_random} y \texttt{vs\_standard}. La infraestructura genera CSV homogéneos con partidas, victorias, \textit{winrate}, puntos medios, rango medio, decisiones LLM, \textit{fallback} y proveedor/modelo cuando aplica.
+Se refactorizaron los benchmarks en un módulo común, \texttt{benchmark\_common.py}, con wrappers para \texttt{vs\_random} y \texttt{vs\_standard}. La infraestructura genera CSV homogéneos con partidas, victorias, \textit{winrate}, puntos medios, rango medio, decisiones LLM, \textit{fallback} y proveedor/modelo cuando aplica. En la versión final del código, el benchmark también contabiliza \texttt{match\_error\_count} para no confundir excepciones de ejecución con derrotas normales al repetir experimentos.
 
 Los experimentos heurísticos se ejecutaron con semillas reproducibles. En la evaluación iterativa se usaron las semillas \texttt{42}, \texttt{31415} y \texttt{2026}, 25 partidas por posición contra random, es decir, 100 partidas por semilla. Para los experimentos LLM se utilizaron ejecuciones completas cuando el coste lo permitió y ejecuciones ligeras para los modelos locales.
 
@@ -55,7 +72,7 @@ $env:CATAN_BENCH_MAX_PERMUTATIONS='25'
 python -m PyCatan.benchmark_vs_random
 python -m PyCatan.benchmark_vs_agentes_estandar
 \end{verbatim}
-Para los experimentos LLM se usan los scripts \texttt{run\_bedrock\_llm\_benchmarks.py}, \texttt{run\_upv\_llm\_benchmarks.py} y \texttt{run\_llm\_light\_matrix.py}, configurando \texttt{CATAN\_LLM\_PROVIDER}, \texttt{CATAN\_LLM\_MODEL} y las credenciales del proveedor correspondiente. La batería de pruebas se ejecuta con \texttt{python -m unittest discover -s PyCatan/Tests -p "test\_*.py"}.
+Para los experimentos LLM se usan los scripts \texttt{run\_bedrock\_llm\_benchmarks.py}, \texttt{run\_upv\_llm\_benchmarks.py} y \texttt{run\_llm\_light\_matrix.py}, configurando \texttt{CATAN\_LLM\_PROVIDER}, \texttt{CATAN\_LLM\_MODEL} y las credenciales del proveedor correspondiente. La batería de pruebas se ejecuta con \texttt{python -m unittest discover -s PyCatan/Tests -p "test\_*.py"} y cubre legalidad básica de decisiones, \textit{fallback} del motor LLM y utilidades heurísticas; no pretende ser una verificación exhaustiva de todo el simulador.
 
 \section{Resultados del agente heurístico}
 La Tabla \ref{tab:iterativo} resume el experimento de ablación. La columna \textit{gate 70\%} indica si la configuración supera el requisito mínimo frente a agentes random.
@@ -78,7 +95,7 @@ iter4 thief devcards & 1.0000 & 0.0000 & 1.0000 & Sí \\
 \label{tab:iterativo}
 \end{table}
 
-El salto más importante aparece al activar \texttt{on\_build\_phase}. Esto confirma que, en este simulador, convertir recursos en construcciones de forma coherente es más decisivo que mejorar únicamente la colocación inicial. La fase de comercio termina de cerrar el comportamiento: al desbloquear intercambios orientados a objetivos, el agente alcanza 100\% de victorias contra random en las semillas del gate.
+El salto más importante aparece al activar \texttt{on\_build\_phase}. Esto sugiere que, en este simulador, convertir recursos en construcciones de forma coherente es más decisivo que mejorar únicamente la colocación inicial. La fase de comercio termina de cerrar el comportamiento: al desbloquear intercambios orientados a objetivos, el agente alcanza 100\% de victorias contra random en las semillas del \textit{gate}.
 
 Frente a agentes estándar, la primera versión competitiva evaluada fue \texttt{iter2\_build\_phase}. Sus resultados aparecen en la Tabla \ref{tab:std}. Aunque ya supera ampliamente al random, el rendimiento frente a agentes más fuertes todavía no es dominante, lo que muestra que el comercio y los módulos posteriores no son cosméticos.
 
@@ -115,12 +132,14 @@ vs estándar & 42, 2026, 31415 & 300 & 271 & 0.9033 & 9.7200 \\
 \label{tab:heurfinal}
 \end{table}
 
-Este resultado refuerza la conclusión experimental: el agente no solo explota la debilidad del random, sino que mantiene un rendimiento alto frente a agentes estándar del simulador. El paso de 0.40 aproximadamente en \texttt{iter2} a 0.90 en la versión final muestra que comercio, ladrón y cartas sí aportan robustez contra oponentes no aleatorios.
+Este resultado refuerza la conclusión experimental dentro de las semillas evaluadas: el agente no solo mejora con claridad sobre el \textit{random}, sino que mantiene un rendimiento alto frente a agentes estándar del simulador. El paso de 0.40 aproximadamente en \texttt{iter2} a 0.90 en la versión final muestra que comercio, ladrón y cartas aportan robustez adicional contra oponentes no aleatorios.
 
 \section{Integración de LLM}
 El agente LLM se implementó como una variante de \texttt{ShiyiHeuristicAgent}. El modelo se consulta en dos decisiones: \texttt{on\_game\_start} y \texttt{on\_build\_phase}. En cada llamada se envía el estado mínimo necesario, una lista indexada de acciones legales y una instrucción para devolver JSON con el campo \texttt{action\_index}. Si la respuesta es inválida, fuera de rango o no llega a tiempo, el sistema registra \textit{fallback} y usa la acción heurística.
 
-Se diseñaron tres variantes de prompt: \texttt{compact\_json}, \texttt{resource\_focus} y \texttt{safe\_legal}. Los experimentos finales se concentraron en \texttt{compact\_json}, porque es el formato más corto y el que mejor encaja con el requisito de respuesta estructurada. Durante las pruebas locales se detectó un fallo importante: algunos modelos pequeños tendían a copiar el JSON de entrada o a confundir \texttt{action\_index} con \texttt{node\_id}. Para corregirlo, el prompt pasó a usar acciones explícitamente indexadas y la restricción de que \texttt{action\_index} no es ni \texttt{node\_id}, ni \texttt{road\_to}, ni tipo de construcción.
+Para controlar coste y longitud del prompt, el LLM no recibe todo el espacio combinatorio de acciones del juego, sino una \textbf{shortlist heurística} de hasta 14 acciones legales ordenadas por una puntuación simple. Por tanto, el modelo actúa como selector sobre un subconjunto prometedor y legal, no como sustituto completo de la política heurística. Esta decisión reduce tokens, evita acciones inviables y facilita comparar modelos pequeños, aunque limita la capacidad del LLM para explorar jugadas fuera de esa shortlist.
+
+Se diseñaron tres variantes de prompt: \texttt{compact\_json}, \texttt{resource\_focus} y \texttt{safe\_legal}. Los experimentos finales se concentraron en \texttt{compact\_json}, porque es el formato más corto y el que mejor encaja con el requisito de respuesta estructurada; además, la configuración final del agente usa esa variante tanto en \texttt{on\_game\_start} como en \texttt{on\_build\_phase}. Durante las pruebas locales se detectó un fallo importante: algunos modelos pequeños tendían a copiar el JSON de entrada o a confundir \texttt{action\_index} con \texttt{node\_id}. Para corregirlo, el prompt pasó a usar acciones explícitamente indexadas y la restricción de que \texttt{action\_index} no es ni \texttt{node\_id}, ni \texttt{road\_to}, ni tipo de construcción.
 
 Además de diseñarlos, se hizo una comparación ligera de prompts con Bedrock \texttt{nova-micro-v1}. La Tabla \ref{tab:prompts} muestra que los tres prompts consiguen ganar las partidas del ensayo, pero difieren en robustez de formato. En este caso, \texttt{safe\_legal} fue el más estable porque no produjo \textit{fallback}.
 
@@ -162,23 +181,25 @@ Ollama & qwen2.5:0.5b & random & compact & 100 & 0.8300 & 9.21 & 0.0000 & válid
 Ollama & qwen2.5:0.5b & standard & compact & 4 & 0.2500 & 4.75 & 0.0000 & smoke test \\
 \bottomrule
 \end{tabular}
-\caption{Resultados LLM principales. Fuentes: \texttt{results/bedrock\_llm/20260422\_093854}, \texttt{results/upv\_llm/20260422\_120019} y \texttt{results/llm\_light/20260424\_124431}.}
+\caption{Resultados LLM principales. Fuentes: \texttt{results/bedrock\_llm/20260422\_093854/summary.csv}, \texttt{results/upv\_llm/20260422\_120019/summary.csv}, \texttt{results/llm\_light/20260424\_124431} y \texttt{results/llm\_light/20260424\_123948/summary.csv}.}
 \label{tab:llm}
 \end{table}
 
-También se obtuvieron resultados descartados. \texttt{mistral.mistral-7b-instruct-v0:2} en Bedrock registró \textit{fallback\_rate}=1.0, por lo que sus victorias no pueden atribuirse al modelo. En UPV, \texttt{phi4-mini:3.8b} presentó \textit{fallback} de 0.4288 contra random y 0.5751 contra estándar, de modo que tampoco es una configuración fiable. En Ollama, una ejecución antigua de \texttt{gemma2:9b} produjo 0.9745 de \textit{fallback}; después de corregir el prompt, las llamadas directas ya respondían JSON válido, pero no se completó un benchmark limpio. Estos descartes son importantes: si se ignora el \textit{fallback}, el CSV puede mostrar victorias que realmente pertenecen al agente heurístico.
+También se obtuvieron resultados descartados. \texttt{mistral.mistral-7b-instruct-v0:2} en Bedrock registró \textit{fallback\_rate}=1.0, por lo que sus victorias no pueden atribuirse al modelo. En UPV, \texttt{phi4-mini:3.8b} presentó \textit{fallback} de 0.4288 contra random y 0.5751 contra estándar, de modo que tampoco es una configuración fiable. En Ollama, una ejecución antigua de \texttt{gemma2:9b} produjo 0.9745 de \textit{fallback}; después de corregir el prompt, las llamadas directas ya respondían JSON válido, pero no se completó un benchmark limpio. Estos descartes son importantes: si se ignora el \textit{fallback}, el CSV puede mostrar victorias que en la práctica pertenecen al agente heurístico de respaldo.
 
 \section{Análisis de modelos}
 Los modelos de Bedrock fueron los más estables. \texttt{nova-lite-v1} ofreció buen rendimiento sin \textit{fallback} y \texttt{llama3.3-70b} obtuvo el mejor resultado frente a agentes estándar. UPV \texttt{llama-mini} también fue utilizable, aunque con un pequeño \textit{fallback} contra random. En local se detectaron dos modelos mediante Ollama: \texttt{qwen2.5:0.5b} y \texttt{gemma2:9b}. El modelo pequeño, ejecutado en local con una AMD 6600 XT, consiguió completar 100 partidas contra random sin \textit{fallback}, pero su rendimiento fue peor que Bedrock: 0.83 de \textit{winrate} y 9.21 puntos medios. Esto sugiere que responder JSON válido no garantiza buena política.
 
-La latencia local de \texttt{qwen2.5:0.5b} fue baja para un LLM: 488 ms medios por decisión en la ejecución completa contra random, con 8847 decisiones. Aun así, el coste total fue elevado porque se consulta el modelo muchas veces durante la partida. Por ello, una integración práctica debería reservar los LLM para decisiones de alto impacto o usarlos para generar heurísticas, no necesariamente para cada paso frecuente.
+La latencia local de \texttt{qwen2.5:0.5b} fue relativamente baja para un LLM: 488 ms medios por decisión en la ejecución completa contra random, con 8847 decisiones. Aun así, el coste total fue elevado porque se consulta el modelo muchas veces durante la partida. Por ello, una integración práctica debería reservar los LLM para decisiones de alto impacto o usarlos para generar heurísticas, no necesariamente para cada paso frecuente.
 
-En cuanto a tokens y coste, la instrumentación actual del motor registra \texttt{input\_tokens}, \texttt{output\_tokens}, latencia y \textit{fallback} cuando el proveedor los devuelve. La ejecución local completa con \texttt{qwen2.5:0.5b} promedió 356.64 tokens de entrada y 8.05 de salida por decisión. En Bedrock y UPV, las ejecuciones comparables usadas para la tabla principal se generaron con una versión anterior del resumen CSV que no persistía latencia ni tokens; por ese motivo, en esta memoria no se comparan numéricamente esos campos para dichos proveedores. Sí se comparan calidad de decisión, robustez de formato y facilidad de integración. Bedrock fue el más estable en formato y calidad, UPV resultó fácil de integrar con API tipo chat, y Ollama fue el más barato y controlable, aunque dependiente del hardware local y de modelos más débiles.
+En cuanto a tokens y coste, la instrumentación actual del motor registra \texttt{input\_tokens}, \texttt{output\_tokens}, latencia y \textit{fallback} cuando el proveedor los devuelve. La ejecución local completa con \texttt{qwen2.5:0.5b} promedió 356.64 tokens de entrada y 8.05 de salida por decisión. En Bedrock y UPV, las ejecuciones comparables usadas para la tabla principal se generaron con una versión anterior del resumen CSV que no persistía latencia ni tokens; por ese motivo, en esta memoria no se comparan numéricamente esos campos para dichos proveedores. Sí se comparan calidad de decisión, robustez de formato y facilidad de integración. Bedrock fue el más estable en formato y calidad, UPV resultó fácil de integrar con API tipo chat, y Ollama fue el más barato y controlable, aunque dependiente del hardware local y de modelos más débiles. Frente a agentes estándar, en local solo se completó un \textit{smoke test} de 4 partidas para \texttt{qwen2.5:0.5b}; por tanto, ese dato se usa solo como indicio cualitativo y no como benchmark comparable al de Bedrock o UPV.
 
 \section{Viabilidad de los LLM en PyCatan}
 Los LLM pueden integrarse técnicamente en PyCatan, pero presentan tres riesgos. Primero, la salida estructurada no está garantizada: incluso con temperatura baja, algunos modelos devuelven índices fuera de rango o texto adicional. Segundo, la latencia multiplica el tiempo de benchmark. Tercero, si se permite \textit{fallback} silencioso, se sobreestima la calidad del modelo.
 
 La conclusión experimental es que los LLM grandes y bien servidos funcionan como política aproximada para decisiones acotadas, especialmente cuando reciben una lista de acciones legales. Sin embargo, para un agente competitivo, la heurística sigue siendo más barata, reproducible y fácil de depurar. El uso más razonable del LLM sería como apoyo en decisiones estratégicas poco frecuentes, generación de explicaciones o exploración de variantes heurísticas, no como sustituto completo de la política del agente.
+
+Las principales limitaciones de este estudio son tres. Primero, el LLM opera sobre una shortlist heurística y no sobre todo el espacio de acciones, de modo que la comparación mide su capacidad de seleccionar entre opciones prometedoras. Segundo, no todos los proveedores registraron latencia y tokens con el mismo nivel de detalle en todas las corridas. Tercero, por coste computacional, la evaluación local frente a agentes estándar quedó limitada a pruebas ligeras.
 
 \section{Uso de herramientas de IA}
 Durante el desarrollo se usaron asistentes de programación basados en IA para refactorizar benchmarks, diseñar el pipeline experimental, implementar el motor LLM, depurar errores de formato JSON y redactar esta memoria. Su utilidad principal fue acelerar tareas de integración y análisis. La limitación más clara apareció precisamente en la experimentación LLM: una salida aparentemente correcta puede esconder \textit{fallback}, por lo que fue necesario validar con CSV, métricas y pruebas manuales.

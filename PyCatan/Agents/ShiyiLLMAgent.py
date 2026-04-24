@@ -24,7 +24,7 @@ class LLMBehaviorConfig:
     enable_on_game_start: bool = True
     enable_on_build_phase: bool = True
     prompt_variant_on_game_start: str = "compact_json"
-    prompt_variant_on_build_phase: str = "resource_focus"
+    prompt_variant_on_build_phase: str = "compact_json"
     max_actions_on_game_start: int = 14
     max_actions_on_build_phase: int = 14
     decision_timeout_seconds: float = 8.0
@@ -89,6 +89,9 @@ class ShiyiLLMAgent(ShiyiHeuristicAgent):
     def _starting_actions(self, max_actions: int) -> List[Dict[str, int]]:
         actions_with_scores: List[Tuple[float, Dict[str, int]]] = []
 
+        # The LLM does not explore the full combinatorial space directly.
+        # We first build a ranked shortlist of legal actions so the prompt stays
+        # compact and every candidate is valid in the current board state.
         for node_id in self.board.valid_starting_nodes():
             node_score = settlement_score(self.board, node_id, self.weights)
             for road_to in self.board.nodes[node_id]["adjacent"]:
@@ -105,6 +108,8 @@ class ShiyiLLMAgent(ShiyiHeuristicAgent):
     def _build_actions(self, max_actions: int) -> List[Dict[str, Any]]:
         actions_with_scores: List[Tuple[float, Dict[str, Any]]] = []
 
+        # As in on_game_start, the model receives a ranked legal shortlist
+        # produced by the heuristic trunk rather than the raw full action space.
         if self.hand.resources.has_more(BuildConstants.CITY):
             for node_id in self.board.valid_city_nodes(self.id):
                 score = settlement_score(self.board, node_id, self.weights) + 10.0

@@ -56,6 +56,7 @@ BENCHMARK_SUMMARY_FIELDS = [
     "token_decisions",
     "avg_input_tokens",
     "avg_output_tokens",
+    "match_error_count",
     "provider",
     "model",
 ]
@@ -272,6 +273,7 @@ def extract_match_outcome(game_director: GameDirector, position: int):
         input_tokens_total,
         output_tokens_total,
         token_decisions,
+        0,
     )
 
 
@@ -299,7 +301,7 @@ def simulate_match(
     except Exception as exc:
         print("Exception:", repr(exc))
         print(traceback.format_exc())
-        return (0, 0, 4, 0, 0, 0, 0, 0, 0)
+        return (0, 0, 4, 0, 0, 0, 0, 0, 0, 1)
 
 
 def initialize_results(agent_specs: Sequence[Tuple[str, Optional[Any]]], seeds: Sequence[int]):
@@ -317,6 +319,7 @@ def initialize_results(agent_specs: Sequence[Tuple[str, Optional[Any]]], seeds: 
                 "input_tokens_total": 0,
                 "output_tokens_total": 0,
                 "token_decisions": 0,
+                "match_error_count": 0,
                 "matches": 0,
             }
     return results
@@ -347,6 +350,7 @@ def _finalize_summary_rows(
             input_tokens_total = int(stats["input_tokens_total"])
             output_tokens_total = int(stats["output_tokens_total"])
             token_decisions = int(stats["token_decisions"])
+            match_error_count = int(stats["match_error_count"])
 
             winrate = (wins / matches) if matches else 0.0
             avg_points = (points / matches) if matches else 0.0
@@ -378,6 +382,7 @@ def _finalize_summary_rows(
                     "token_decisions": token_decisions,
                     "avg_input_tokens": f"{avg_input_tokens:.2f}",
                     "avg_output_tokens": f"{avg_output_tokens:.2f}",
+                    "match_error_count": match_error_count,
                     "provider": llm_provider if decisions > 0 else "",
                     "model": llm_model if decisions > 0 else "",
                 }
@@ -487,6 +492,7 @@ def run_benchmark_vs_random(
                 input_tokens_total,
                 output_tokens_total,
                 token_decisions,
+                match_error_count,
             ) = future.result()
             stats = results[(identifier, seed)]
             stats["wins"] += victory
@@ -498,6 +504,7 @@ def run_benchmark_vs_random(
             stats["input_tokens_total"] += input_tokens_total
             stats["output_tokens_total"] += output_tokens_total
             stats["token_decisions"] += token_decisions
+            stats["match_error_count"] += match_error_count
             stats["matches"] += 1
             completed += 1
             if completed % 200 == 0 or completed == len(tasks):
@@ -622,6 +629,7 @@ def run_benchmark_vs_standard(
                 input_tokens_total,
                 output_tokens_total,
                 token_decisions,
+                match_error_count,
             ) = future.result()
             stats = results[(identifier, seed)]
             stats["wins"] += victory
@@ -633,6 +641,7 @@ def run_benchmark_vs_standard(
             stats["input_tokens_total"] += input_tokens_total
             stats["output_tokens_total"] += output_tokens_total
             stats["token_decisions"] += token_decisions
+            stats["match_error_count"] += match_error_count
             stats["matches"] += 1
             completed += 1
             if completed % 1000 == 0 or completed == len(tasks):
