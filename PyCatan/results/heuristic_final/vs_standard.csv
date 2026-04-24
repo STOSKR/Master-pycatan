@@ -1,0 +1,4 @@
+agent_path,agent_name,benchmark_type,seed,matches,wins,winrate,points_total,avg_points,avg_rank,llm_decisions,fallback_count,fallback_rate,latency_ms_total,avg_latency_ms,input_tokens_total,output_tokens_total,token_decisions,avg_input_tokens,avg_output_tokens,provider,model
+PyCatan.Agents.ShiyiHeuristicAgent.ShiyiHeuristicAgent,ShiyiHeuristicAgent,vs_standard,42,100,89,0.8900,970,9.7000,1.1100,0,0,0.0000,0,0.00,0,0,0,0.00,0.00,,
+PyCatan.Agents.ShiyiHeuristicAgent.ShiyiHeuristicAgent,ShiyiHeuristicAgent,vs_standard,2026,100,91,0.9100,978,9.7800,1.1000,0,0,0.0000,0,0.00,0,0,0,0.00,0.00,,
+PyCatan.Agents.ShiyiHeuristicAgent.ShiyiHeuristicAgent,ShiyiHeuristicAgent,vs_standard,31415,100,91,0.9100,968,9.6800,1.1200,0,0,0.0000,0,0.00,0,0,0,0.00,0.00,,

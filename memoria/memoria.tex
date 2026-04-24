@@ -42,6 +42,8 @@ Se refactorizaron los benchmarks en un módulo común, \texttt{benchmark\_common
 
 Los experimentos heurísticos se ejecutaron con semillas reproducibles. En la evaluación iterativa se usaron las semillas \texttt{42}, \texttt{31415} y \texttt{2026}, 25 partidas por posición contra random, es decir, 100 partidas por semilla. Para los experimentos LLM se utilizaron ejecuciones completas cuando el coste lo permitió y ejecuciones ligeras para los modelos locales.
 
+Para facilitar la reproducibilidad, los resultados finales se guardaron en CSV dentro de \texttt{PyCatan/results}. Los experimentos heurísticos finales se encuentran en \texttt{results/heuristic\_final}; los experimentos LLM principales están en \texttt{results/bedrock\_llm}, \texttt{results/upv\_llm}, \texttt{results/llm\_phase2} y \texttt{results/llm\_light}. Las ejecuciones fijan semillas, número de partidas y máximo de rondas mediante variables de entorno, por lo que pueden repetirse sin cambiar el código del agente.
+
 \section{Resultados del agente heurístico}
 La Tabla \ref{tab:iterativo} resume el experimento de ablación. La columna \textit{gate 70\%} indica si la configuración supera el requisito mínimo frente a agentes random.
 
@@ -83,10 +85,49 @@ Seed & Partidas & Victorias & Winrate & Puntos medios \\
 \label{tab:std}
 \end{table}
 
+Finalmente se ejecutó el agente heurístico completo, ya con todas las mejoras activadas, frente a random y frente a agentes estándar. La Tabla \ref{tab:heurfinal} resume esos resultados. Cada fila contiene 100 partidas por seed.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{llrrrr}
+\toprule
+Benchmark & Seeds & Partidas & Victorias & Winrate medio & Puntos medios \\
+\midrule
+vs random & 42, 2026, 31415 & 300 & 300 & 1.0000 & 10.1133 \\
+vs estándar & 42, 2026, 31415 & 300 & 271 & 0.9033 & 9.7200 \\
+\bottomrule
+\end{tabular}
+\caption{Evaluación final de \texttt{ShiyiHeuristicAgent}. Fuentes: \texttt{results/heuristic\_final/vs\_random.csv} y \texttt{results/heuristic\_final/vs\_standard.csv}.}
+\label{tab:heurfinal}
+\end{table}
+
+Este resultado refuerza la conclusión experimental: el agente no solo explota la debilidad del random, sino que mantiene un rendimiento alto frente a agentes estándar del simulador. El paso de 0.40 aproximadamente en \texttt{iter2} a 0.90 en la versión final muestra que comercio, ladrón y cartas sí aportan robustez contra oponentes no aleatorios.
+
 \section{Integración de LLM}
 El agente LLM se implementó como una variante de \texttt{ShiyiHeuristicAgent}. El modelo se consulta en dos decisiones: \texttt{on\_game\_start} y \texttt{on\_build\_phase}. En cada llamada se envía el estado mínimo necesario, una lista indexada de acciones legales y una instrucción para devolver JSON con el campo \texttt{action\_index}. Si la respuesta es inválida, fuera de rango o no llega a tiempo, el sistema registra \textit{fallback} y usa la acción heurística.
 
 Se diseñaron tres variantes de prompt: \texttt{compact\_json}, \texttt{resource\_focus} y \texttt{safe\_legal}. Los experimentos finales se concentraron en \texttt{compact\_json}, porque es el formato más corto y el que mejor encaja con el requisito de respuesta estructurada. Durante las pruebas locales se detectó un fallo importante: algunos modelos pequeños tendían a copiar el JSON de entrada o a confundir \texttt{action\_index} con \texttt{node\_id}. Para corregirlo, el prompt pasó a usar acciones explícitamente indexadas y la restricción de que \texttt{action\_index} no es ni \texttt{node\_id}, ni \texttt{road\_to}, ni tipo de construcción.
+
+Además de diseñarlos, se hizo una comparación ligera de prompts con Bedrock \texttt{nova-micro-v1}. La Tabla \ref{tab:prompts} muestra que los tres prompts consiguen ganar las partidas del ensayo, pero difieren en robustez de formato. En este caso, \texttt{safe\_legal} fue el más estable porque no produjo \textit{fallback}.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{lrrrr}
+\toprule
+Prompt & Partidas & Winrate & Puntos medios & Fallback \\
+\midrule
+compact\_json & 4 & 1.0000 & 10.25 & 0.0629 \\
+resource\_focus & 4 & 1.0000 & 10.00 & 0.0432 \\
+safe\_legal & 4 & 1.0000 & 10.00 & 0.0000 \\
+\bottomrule
+\end{tabular}
+\caption{Comparación ligera de prompts con Bedrock \texttt{nova-micro-v1}. Fuente: \texttt{results/llm\_phase2/llm\_phase2\_summary.csv}.}
+\label{tab:prompts}
+\end{table}
+
+Esta prueba no pretende demostrar superioridad estratégica con solo cuatro partidas, pero sí sirve para evaluar el formato de interacción. En LLM aplicados a simuladores, un prompt que gana pero genera \textit{fallback} es menos fiable que uno ligeramente más conservador y estable.
 
 \section{Resultados LLM}
 La Tabla \ref{tab:llm} recoge los resultados comparables disponibles. Se marca como inválido cualquier resultado con \textit{fallback} alto, porque en ese caso la política real no es el LLM, sino la heurística de respaldo.
@@ -130,8 +171,10 @@ Durante el desarrollo se usaron asistentes de programación basados en IA para r
 \section{Conclusiones}
 \begin{enumerate}
 \item El agente heurístico supera ampliamente el objetivo de 70\% frente a random desde la iteración de construcción, y alcanza 100\% al añadir comercio en las semillas evaluadas.
-\item La ablación muestra que \texttt{on\_build\_phase} es la mejora más decisiva; el comercio consolida el rendimiento.
+\item La versión final obtiene 100\% frente a random y 90.33\% frente a agentes estándar en 300 partidas por benchmark.
+\item La ablación muestra que \texttt{on\_build\_phase} es la mejora más decisiva; el comercio y los módulos posteriores consolidan el rendimiento contra oponentes más fuertes.
 \item La integración LLM funciona en dos decisiones reales del agente: colocación inicial y construcción.
+\item Se compararon tres prompts. \texttt{safe\_legal} fue el más robusto en el ensayo ligero porque consiguió \textit{fallback}=0.
 \item Bedrock \texttt{nova-lite-v1} y \texttt{llama3.3-70b} son las configuraciones más sólidas entre las evaluadas.
 \item Ollama local es viable técnicamente, pero los modelos pequeños requieren prompts muy estrictos y aun así ofrecen menor calidad de decisión.
 \item El \textit{fallback} debe tratarse como métrica crítica. Los resultados con \textit{fallback} alto no son válidos para comparar modelos.
