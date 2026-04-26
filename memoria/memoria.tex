@@ -114,7 +114,9 @@ Este resultado refuerza la conclusión experimental dentro de las semillas evalu
 La explicación más prudente para una tasa tan alta frente a estándar no es que cada módulo individual haya sido demostrado como superior por separado, sino que la política final combina varias ventajas simples y consistentes: construye siempre que puede, prioriza ciudades y pueblos, escoge nodos productivos y variados, usa carreteras para abrir nuevas posiciones, y comercia con la banca solo cuando el intercambio acerca al objetivo actual. Además, las reglas de ladrón y cartas evitan algunas acciones desperdiciadas. Lo que queda como limitación es que el benchmark final no aísla cuánto aporta cada pieza contra agentes estándar, solo demuestra el rendimiento del conjunto completo.
 
 \section{Integración de LLM}
-El agente LLM parte de \texttt{ShiyiHeuristicAgent}. La integración consulta el modelo en \texttt{on\_game\_start} y \texttt{on\_build\_phase}. Cada llamada contiene el estado mínimo necesario, una lista indexada de acciones legales y una instrucción para devolver JSON con el campo \texttt{action\_index}. Si la respuesta es inválida, fuera de rango o no llega a tiempo, el sistema registra fallback y toma la acción heurística.
+El agente LLM parte de \texttt{ShiyiHeuristicAgent}. La integración consulta el modelo en \texttt{on\_game\_start} y \texttt{on\_build\_phase}. Cada llamada contiene el estado mínimo necesario, una lista indexada de acciones legales y una instrucción para devolver JSON con el campo \texttt{action\_index}.
+
+En esta memoria, fallback significa que el modelo no decide la acción final y el sistema usa en su lugar la acción que habría elegido la heurística. Se produce si el proveedor no está configurado, si hay error o timeout, si la respuesta no contiene un \texttt{action\_index} recuperable, o si el índice queda fuera de la lista de acciones legales. Esto evita acciones ilegales y permite terminar la partida, pero también contamina el resultado: con fallback alto, el winrate mide sobre todo la heurística de respaldo y no la calidad del LLM.
 
 Para controlar coste y longitud del prompt, el LLM no recibe todo el espacio combinatorio de acciones del juego, sino una lista corta de hasta 14 acciones legales ordenadas por una puntuación simple. Por tanto, el modelo actúa como selector sobre un subconjunto prometedor y legal, no como sustituto completo de la política heurística. Esta decisión reduce tokens, evita acciones inviables y facilita comparar modelos pequeños, aunque limita la capacidad del LLM para explorar jugadas fuera de esa lista.
 
@@ -141,7 +143,7 @@ safe\_legal & 4 & 1.0000 & 10.00 & 0.0000 \\
 Esta prueba no pretende demostrar superioridad estratégica con solo cuatro partidas, pero sí sirve para evaluar el formato de interacción. En LLM aplicados a simuladores, un prompt que gana pero genera fallback es menos fiable que uno ligeramente más conservador y estable.
 
 \section{Resultados LLM}
-La Tabla \ref{tab:llm} recoge los resultados principales para comparar modelos. La tabla los separa de los experimentos exploratorios porque no todas las corridas tienen el mismo tamaño ni la misma fiabilidad. El análisis marca como inválido cualquier resultado con fallback alto, porque en ese caso la política real no es el LLM, sino la heurística de respaldo.
+La Tabla \ref{tab:llm} recoge los resultados principales para comparar modelos. La tabla separa los benchmarks completos de las pruebas cortas, porque no todas las corridas tienen el mismo tamaño ni la misma fiabilidad. El análisis marca como inválido cualquier resultado con fallback alto, porque en ese caso la política real no es el LLM, sino la heurística de respaldo.
 
 \begin{table}[H]
 \centering
@@ -156,7 +158,7 @@ Bedrock & llama3.3-70b & random & compact & 100 & 1.0000 & 10.12 & 0.0002 & vál
 Bedrock & llama3.3-70b & standard & compact & 100 & 0.9400 & 9.77 & 0.0002 & válido \\
 UPV & llama-mini & random & compact & 100 & 1.0000 & 10.05 & 0.0143 & aceptable \\
 UPV & llama-mini & standard & compact & 100 & 0.9000 & 9.63 & 0.0000 & válido \\
-Ollama & qwen2.5:0.5b & random & compact & 100 & 0.8300 & 9.21 & 0.0000 & válido parcial \\
+Ollama & qwen2.5:0.5b & random & compact & 100 & 0.8300 & 9.21 & 0.0000 & válido \\
 Ollama & qwen2.5:0.5b & standard & compact & 4 & 0.2500 & 4.75 & 0.0000 & prueba corta limpia \\
 \bottomrule
 \end{tabular}
@@ -164,26 +166,38 @@ Ollama & qwen2.5:0.5b & standard & compact & 4 & 0.2500 & 4.75 & 0.0000 & prueba
 \label{tab:llm}
 \end{table}
 
-Además de los resultados principales, el trabajo conserva experimentos exploratorios y descartes. La Tabla \ref{tab:llm_all} resume todas las familias de experimentos realizados. En los casos con varias corridas, la tabla indica la ejecución final o el patrón observado; las corridas de solo 4 partidas cuentan como pruebas cortas, no como benchmarks concluyentes.
+Además de los resultados principales, el trabajo conserva experimentos exploratorios y descartes. La Tabla \ref{tab:llm_all} resume qué se probó, qué resultado apareció y si puede atribuirse realmente al modelo. Las pruebas de solo 4 partidas sirven para comprobar formato y estabilidad, no como benchmarks concluyentes.
 
 \begin{table}[H]
 \centering
-\tiny
-\begin{tabular}{p{2.0cm}p{2.4cm}p{2.4cm}p{2.0cm}p{2.2cm}p{3.0cm}}
+\scriptsize
+\renewcommand{\arraystretch}{1.16}
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{L{2.7cm}L{4.3cm}L{4.6cm}L{4.4cm}}
 \toprule
-Proveedor/modelo & Runs & Tamaño & Resultado observado & Fallback & Uso en el análisis \\
+Proveedor/modelo & Pruebas realizadas & Resultado observado & Lectura \\
 \midrule
-Bedrock nova-micro & 20260421\_225325, fase prompts & 4 random, 8 standard; prompts de 4 partidas & Gana los ensayos ligeros & 0.0256--0.0629 & Exploratorio de formato y prompts \\
-Bedrock Mistral 7B & 20260422\_091024, 20260422\_093854 & 4+4 y 100+100 & 1.00 random, 0.89 standard en final & 1.0000 & Descartado: decide casi siempre el respaldo \\
-Bedrock nova-lite & 20260422\_091024, 20260422\_093854 & 4+4 y 100+100 & 1.00 random, 0.91 standard & 0.0000 & Válido \\
-Bedrock llama3.3-70b & 20260422\_091024, 20260422\_093854 & 4+4 y 100+100 & 1.00 random, 0.94 standard & 0.0002 & Válido, mejor Bedrock \\
-UPV gpt-4o-mini & 20260422\_091742 & 4+4 & Gana el ensayo & 1.0000 & Descartado por fallback total \\
-UPV poligpt & 20260422\_111137 & 4+4 & Gana el ensayo & 0.3140/0.8625 & Descartado por fallback alto \\
-UPV llama-mini & 20260422\_111137, 113434, 120019 & 4+4, 4+4 y 100+100 & 1.00 random, 0.90 standard en final & 0.0143/0.0000 final & Válido \\
-UPV phi4-mini & 20260422\_113211, 120019 & 4+4 y 100+100 & 1.00 random, 0.87 standard en final & 0.4288/0.5751 final & No fiable por fallback alto \\
-UPV qwen3:4b & 20260422\_113726 & 4+4 & Gana el ensayo & 1.0000 & Descartado por fallback total \\
-Ollama qwen2.5:0.5b & 20260424\_092944, 121936, 123239, 123948, 124431 & 16 random; 4+4; 4 random; 4+4; 100 random & 0.83 random limpio final; 0.25 standard en prueba corta limpia & de 0.7405 a 0.0000 & Válido parcial; muestra mejora del prompt y límite de calidad local \\
-Ollama gemma2:9b & 20260424\_101820, 122342 & 100 random; intento posterior incompleto & 1.00 random en prueba antigua & 0.9745 & Descartado; no hay benchmark limpio posterior \\
+Bedrock nova-micro & Prueba inicial de 4 partidas contra random y 8 contra estándar; después, comparación de tres prompts con 4 partidas cada uno. & Gana los ensayos pequeños. Fallback entre 0.0000 y 0.0629 según prueba. & Sirve para elegir prompt, pero no como benchmark final por tamaño reducido. \\
+\addlinespace[0.25em]
+Bedrock Mistral 7B & Prueba corta y benchmark completo de 100 partidas contra random y 100 contra estándar. & 1.00 random y 0.89 estándar en el benchmark completo, pero con fallback 1.0000. & Descartado: las victorias pertenecen al respaldo heurístico, no al modelo. \\
+\addlinespace[0.25em]
+Bedrock nova-lite & Prueba corta y benchmark completo de 100 partidas contra random y 100 contra estándar. & 1.00 random, 0.91 estándar, fallback 0.0000. & Válido. Es el modelo Bedrock más limpio por estabilidad de formato. \\
+\addlinespace[0.25em]
+Bedrock llama3.3-70b & Prueba corta y benchmark completo de 100 partidas contra random y 100 contra estándar. & 1.00 random, 0.94 estándar, fallback 0.0002. & Válido. Es el mejor resultado frente a agentes estándar. \\
+\addlinespace[0.25em]
+UPV gpt-4o-mini & Prueba corta de 4 partidas contra random y 4 contra estándar. & 1.00 en ambas pruebas, fallback 1.0000. & Descartado por fallback total. \\
+\addlinespace[0.25em]
+UPV poligpt & Prueba corta de 4 partidas contra random y 4 contra estándar. & 1.00 en ambas pruebas, con fallback 0.3140 contra random y 0.8625 contra estándar. & Descartado por fallback alto, sobre todo contra estándar. \\
+\addlinespace[0.25em]
+UPV llama-mini & Pruebas cortas limpias y benchmark completo de 100 partidas contra random y 100 contra estándar. & 1.00 random con fallback 0.0143; 0.90 estándar con fallback 0.0000. & Válido. Rendimiento parecido a nova-lite, aunque algo inferior frente a estándar. \\
+\addlinespace[0.25em]
+UPV phi4-mini & Prueba corta y benchmark completo de 100 partidas contra random y 100 contra estándar. & 1.00 random y 0.87 estándar en el benchmark completo, pero con fallback 0.4288 y 0.5751. & No fiable para comparar modelos: demasiadas decisiones vienen del respaldo. \\
+\addlinespace[0.25em]
+UPV qwen3:4b & Prueba corta de 4 partidas contra random y 4 contra estándar. & 1.00 en ambas pruebas, fallback 1.0000. & Descartado por fallback total. \\
+\addlinespace[0.25em]
+Ollama qwen2.5:0.5b & Varias pruebas locales: 16 random con fallback alto, pruebas de 4 partidas, una prueba limpia de 4+4 y una ejecución limpia de 100 random. & Al limpiar el fallback, baja el rendimiento: 0.83 random en 100 partidas y 0.25 estándar en una prueba limpia de 4 partidas. & Válido solo contra random. Frente a estándar queda como indicio, no como benchmark comparable. \\
+\addlinespace[0.25em]
+Ollama gemma2:9b & Prueba local de 100 partidas contra random e intento posterior sin benchmark completo limpio. & 1.00 random, pero con fallback 0.9745. & Descartado: casi todo lo decide el respaldo heurístico. \\
 \bottomrule
 \end{tabular}
 \caption{Experimentos LLM realizados, incluyendo corridas exploratorias y descartadas.}
@@ -193,7 +207,7 @@ Ollama gemma2:9b & 20260424\_101820, 122342 & 100 random; intento posterior inco
 Estos descartes son importantes: si se ignora el fallback, un resumen puede mostrar victorias que en la práctica pertenecen al agente heurístico de respaldo. Por ejemplo, \texttt{mistral.mistral-7b-instruct-v0:2}, UPV \texttt{gpt-4o-mini}, UPV \texttt{qwen3:4b} y la ejecución antigua de Ollama \texttt{gemma2:9b} ganan o puntúan bien, pero sus decisiones no pueden atribuirse al modelo porque el respaldo domina la partida.
 
 \section{Análisis de modelos}
-Los modelos de Bedrock fueron los más estables. \texttt{nova-lite-v1} ofreció buen rendimiento sin fallback y \texttt{llama3.3-70b} obtuvo el mejor resultado frente a agentes estándar. UPV \texttt{llama-mini} también fue viable, aunque con un pequeño fallback contra random. La parte local incluye dos modelos mediante Ollama: \texttt{qwen2.5:0.5b} y \texttt{gemma2:9b}. Las primeras ejecuciones de \texttt{qwen2.5:0.5b} tuvieron mucho fallback o fueron pruebas cortas; tras endurecer el prompt y activar abortos por fallback, quedó completa una ejecución limpia de 100 partidas contra random. El resultado fue peor que Bedrock: 0.83 de winrate y 9.21 puntos medios. Esto sugiere que responder JSON válido no garantiza buena política.
+Los modelos de Bedrock fueron los más estables, \texttt{nova-lite-v1} ha ofrecido buen rendimiento sin fallback y \texttt{llama3.3-70b} obtuvo el mejor resultado frente a agentes estándar. UPV \texttt{llama-mini} también fue viable, aunque con un pequeño fallback contra random. La parte local incluye dos modelos mediante Ollama: \texttt{qwen2.5:0.5b} y \texttt{gemma2:9b}. Las primeras ejecuciones de \texttt{qwen2.5:0.5b} tuvieron mucho fallback o fueron pruebas cortas; tras endurecer el prompt y activar abortos por fallback, quedó completa una ejecución limpia de 100 partidas contra random. El resultado fue peor que Bedrock: 0.83 de winrate y 9.21 puntos medios. Esto sugiere que responder JSON válido no garantiza buena política.
 
 La latencia local de \texttt{qwen2.5:0.5b} fue relativamente baja para un LLM: 488 ms medios por decisión en la ejecución completa contra random, con 8847 decisiones. Aun así, el coste total fue elevado porque el código llama al modelo muchas veces durante la partida. Por ello, una integración práctica debería reservar los LLM para decisiones de alto impacto o para generar heurísticas, no necesariamente para cada paso frecuente.
 
